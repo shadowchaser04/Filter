@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2020_10_10_034458) do
+ActiveRecord::Schema.define(version: 2020_10_10_084004) do
 
   create_table "auditories", force: :cascade do |t|
     t.string "word"
@@ -110,7 +110,9 @@ ActiveRecord::Schema.define(version: 2020_10_10_034458) do
 
   create_table "users", force: :cascade do |t|
     t.string "uploader"
-    t.integer "channel_id"
+    t.string "channel_id"
+    t.json "accumulator"
+    t.datetime "accumulator_last_update"
   end
 
   create_table "visuals", force: :cascade do |t|

@@ -2,8 +2,10 @@
 
 one:
   uploader: MyString
-  channel_id: 1
+  channel_id: MyString
+  accumulator: 
 
 two:
   uploader: MyString
-  channel_id: 1
+  channel_id: MyString
+  accumulator: 

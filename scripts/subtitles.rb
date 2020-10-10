@@ -393,7 +393,6 @@ div
 #------------------------------------------------------------------------------
 # format
 #------------------------------------------------------------------------------
-binding.pry
 yt_user = User.find_or_create_by(uploader: json_hash['uploader'], channel_id: json_hash['channel_id'])
 re = yt_user.youtube_results.find_or_create_by(title: json_hash['title'])
 re.update(duration: json_hash['duration'], meta_data: {total: all_topics, top_count: top_count_hash})
