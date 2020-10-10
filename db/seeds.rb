@@ -4,6 +4,27 @@ require 'pry'
 require 'json'
 require 'logger'
 
+# TODO: log files to keep track.
+#------------------------------------------------------------------------------
+# logger
+#------------------------------------------------------------------------------
+
+def blue(color)
+  "\e[34m#{color}\e[0m"
+end
+
+# log app status's
+logger = Logger.new(STDOUT,
+  level: Logger::INFO,
+  progname: 'youtube',
+  datetime_format: '%Y-%m-%d %H:%M:%S',
+  formatter: proc do |severity, datetime, progname, msg|
+    "[#{blue(progname)}][#{datetime}], #{severity}: #{msg}\n"
+  end
+)
+
+logger.info("Youtube Subtitles Seeding...")
+
 #------------------------------------------------------------------------------
 # Files paths
 #------------------------------------------------------------------------------
@@ -21,6 +42,8 @@ root = "#{home}/Code/Ruby/Projects/#{app_name}/lib/data"
 
 # filepaths to each file.
 filepaths = sub_dir(root)
+logger.info("#{filepaths.count} files found in the filepath") if filepaths.present?
+
 
 #------------------------------------------------------------------------------
 # Create data sets
@@ -38,7 +61,9 @@ filepaths.each do |data_file|
 
     # check the model table exists in the db and has no entries.
     unless k.constantize.count > 0
-      # loop through each word in the blist array.
+    logger.info("currently seeding #{k}")
+
+      # loop through each word in the json array.
       v.each do |item|
         k.constantize.find_or_create_by(word: item)
       end

@@ -3,10 +3,11 @@ require File.expand_path('../../config/environment', __FILE__)
 require 'pry'
 require 'json'
 require 'logger'
-binding.pry
 
 # TODO: data sets that are more than one word.
 # TODO: downcase all words going into the db.
+# TODO: add frequency for some words.
+# TODO: add sentences to the output, look at each paragraph or just result.
 #------------------------------------------------------------------------------
 # methods
 #------------------------------------------------------------------------------
@@ -347,7 +348,6 @@ rails_models.each do |k|
   end
 end
 
-puts sentences
 #------------------------------------------------------------------------------
 # rank the paragraphs - highest total
 #------------------------------------------------------------------------------
@@ -384,15 +384,17 @@ new_par.each do |k,paragraph|
   paragraph[0].each_with_index { |p,i| puts "\n" + "#{i}) #{p[0]} \n #{p[1]} \n #{p[2]} \n #{p[3]}" }
   div
 end
+puts "sentences"
+puts sentences
+div
 all_topics.each {|k,v| puts "#{k} -> #{v} \n" }
 div
-
-time = TimeFormatter.new
-time.format_time(json_hash['duration'])
 
 #------------------------------------------------------------------------------
 # format
 #------------------------------------------------------------------------------
+binding.pry
 yt_user = User.find_or_create_by(uploader: json_hash['uploader'], channel_id: json_hash['channel_id'])
 re = yt_user.youtube_results.find_or_create_by(title: json_hash['title'])
-re.update(duration: json_hash['duration'], subtitles: [], meta_data: {total: all_topics, top_count: top_count_hash})
+re.update(duration: json_hash['duration'], meta_data: {total: all_topics, top_count: top_count_hash})
+
