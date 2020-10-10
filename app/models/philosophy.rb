@@ -1,0 +1,2 @@
+class Philosophy < ApplicationRecord
+end

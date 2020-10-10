@@ -4,6 +4,7 @@ class CreateUsers < ActiveRecord::Migration[6.0]
       t.string :uploader
       t.string :channel_id
       t.json :accumulator
+      t.datetime :accumulator_last_update
     end
   end
 end
