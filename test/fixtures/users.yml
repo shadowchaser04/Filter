@@ -1,0 +1,9 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  uploader: MyString
+  channel_id: 1
+
+two:
+  uploader: MyString
+  channel_id: 1

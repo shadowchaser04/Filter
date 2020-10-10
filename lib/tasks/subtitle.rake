@@ -1,21 +1,28 @@
+#!/usr/bin/env ruby
+require "pry"
+
 # Creates and array of absolute filepaths.
 def sub_dir(directory_location)
     Dir.glob(directory_location + "/**/*").select{ |f| File.file? f }
 end
 
 # root data directory.
-root = "/Users/shadowchaser/Code/Ruby/Projects/youtube_filter/lib/data"
+root = "/Users/shadowchaser/Code/Ruby/Projects/filter/lib/data"
 
 # filepaths to each file.
-filepaths = sub_dir(root)
-
 namespace :subtitle do
 
   desc "build all models corrisponding to the datasets Example: subtitle:build_models"
   task :build_models => :environment do
 
+    # datasets paths
+    filepaths = sub_dir(root)
+
     # iterate over each file of the datasets
-    filepaths.each do |name|
+    filepaths.each do |file|
+
+      # remove the file extention leaving just the end of the file name.
+      name = File.basename(file,File.extname(file))
 
       # eager load the models
       Rails.application.eager_load!
@@ -29,6 +36,7 @@ namespace :subtitle do
     end
   end
 
+  # TODO: check whether they have been built already.
   desc "create the user model"
   task user: :environment do
     sh "rails g model User uploader:string channel_id:integer --no-timestamps"
@@ -41,11 +49,11 @@ namespace :subtitle do
 
   desc "build full filter app"
   task full_build: :environment do
-    rake "subtitle:user"
-    rake "subtitle:result"
-    rake "subtitle:build_models"
-    rake "db:migrate"
-    rake "db:seed"
+    sh "rake subtitle:user"
+    sh "rake subtitle:result"
+    sh "rake subtitle:build_models"
+    sh "rake db:migrate"
+    sh "rake db:seed"
   end
 
 end
