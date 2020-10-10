@@ -4,6 +4,8 @@ require 'pry'
 require 'json'
 require 'logger'
 
+# TODO: add total duration time. this can be used to look at frequency later.
+#
 result_hash = Hash.new {|h,k| h[k] = Hash.new(0) }
 
 User.all.each do |item|
