@@ -1,0 +1,2 @@
+class Auditory < ApplicationRecord
+end

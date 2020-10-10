@@ -1,0 +1,2 @@
+class Olfactory < ApplicationRecord
+end

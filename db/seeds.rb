@@ -5,23 +5,6 @@ require 'json'
 require 'logger'
 
 #------------------------------------------------------------------------------
-# Data
-#------------------------------------------------------------------------------
-# predicates_audio 
-# predicates_gustatory
-# predicates_kinesthetic 
-# predicates_olfactory 
-# predicates_visual  
-# sentiment_negative 
-# sentiment_posative  
-# family  
-# political_campaigne 
-# political_systems 
-# political_vocabulary
-# religion 
-# spirituality
-
-#------------------------------------------------------------------------------
 # Files paths
 #------------------------------------------------------------------------------
 
@@ -30,8 +13,11 @@ def sub_dir(directory_location)
     Dir.glob(directory_location + "/**/*").select{ |f| File.file? f }
 end
 
+home = ENV['HOME']
+app_name = Rails.application.class.parent.to_s.underscore
+
 # root data directory.
-root = "/Users/shadowchaser/Code/Ruby/Projects/youtube_filter/lib/data"
+root = "#{home}/Code/Ruby/Projects/#{app_name}/lib/data"
 
 # filepaths to each file.
 filepaths = sub_dir(root)
@@ -50,7 +36,7 @@ filepaths.each do |data_file|
   # each files key and v == array
   data_hash.each do |k,v|
 
-    # check if table exists and the model is empty.
+    # check the model table exists in the db and has no entries.
     unless k.constantize.count > 0
       # loop through each word in the blist array.
       v.each do |item|

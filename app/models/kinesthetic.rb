@@ -1,0 +1,2 @@
+class Kinesthetic < ApplicationRecord
+end

@@ -10,11 +10,111 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2020_10_10_025704) do
+ActiveRecord::Schema.define(version: 2020_10_10_034458) do
+
+  create_table "auditories", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "blacklists", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "boxers", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "countries", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "families", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "footballs", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "gustatories", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "kinesthetics", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "negative_sentiments", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "olfactories", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "painters", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "poets", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "political_campaignes", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "political_systems", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "political_vocabularies", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "posative_sentiments", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "profanity_obscenes", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "profanity_profanes", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "profanity_vulgars", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "religions", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "singers", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "spiritualities", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "tvshows", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "ufcs", force: :cascade do |t|
+    t.string "word"
+  end
 
   create_table "users", force: :cascade do |t|
     t.string "uploader"
     t.integer "channel_id"
+  end
+
+  create_table "visuals", force: :cascade do |t|
+    t.string "word"
   end
 
   create_table "youtube_results", force: :cascade do |t|

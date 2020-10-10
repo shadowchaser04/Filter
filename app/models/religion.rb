@@ -1,0 +1,2 @@
+class Religion < ApplicationRecord
+end

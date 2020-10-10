@@ -21,7 +21,7 @@ namespace :subtitle do
     # iterate over each file of the datasets
     filepaths.each do |file|
 
-      # remove the file extention leaving just the end of the file name.
+      # remove the file extension leaving just the end of the file name.
       name = File.basename(file,File.extname(file))
 
       # eager load the models
@@ -36,7 +36,6 @@ namespace :subtitle do
     end
   end
 
-  # TODO: check whether they have been built already.
   desc "create the user model"
   task user: :environment do
     sh "rails g model User uploader:string channel_id:integer --no-timestamps"
@@ -49,9 +48,16 @@ namespace :subtitle do
 
   desc "build full filter app"
   task full_build: :environment do
+
+    # build subtitles user model NOTE: this does not add the has_many assosh.
     sh "rake subtitle:user"
+
+    # build the belongs_to association between User and YoutubeResult.
     sh "rake subtitle:result"
+
+    # build the models for each of the datasets found in the filepath.
     sh "rake subtitle:build_models"
+
     sh "rake db:migrate"
     sh "rake db:seed"
   end
