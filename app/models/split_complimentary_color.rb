@@ -1,0 +1,2 @@
+class SplitComplimentaryColor < ApplicationRecord
+end

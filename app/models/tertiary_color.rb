@@ -1,0 +1,2 @@
+class TertiaryColor < ApplicationRecord
+end

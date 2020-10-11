@@ -1,0 +1,2 @@
+class AnalogousColor < ApplicationRecord
+end

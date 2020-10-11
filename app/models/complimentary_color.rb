@@ -1,0 +1,2 @@
+class ComplimentaryColor < ApplicationRecord
+end

@@ -1,0 +1,2 @@
+class PoliticalSystem < ApplicationRecord
+end

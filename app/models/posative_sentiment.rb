@@ -1,0 +1,2 @@
+class PosativeSentiment < ApplicationRecord
+end

@@ -1,0 +1,2 @@
+class NegativeSentiment < ApplicationRecord
+end

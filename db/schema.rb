@@ -10,9 +10,13 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2020_10_10_200438) do
+ActiveRecord::Schema.define(version: 2020_10_11_021338) do
 
   create_table "actors", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "analogous_colors", force: :cascade do |t|
     t.string "word"
   end
 
@@ -29,6 +33,14 @@ ActiveRecord::Schema.define(version: 2020_10_10_200438) do
   end
 
   create_table "cars", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "colors", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "complimentary_colors", force: :cascade do |t|
     t.string "word"
   end
 
@@ -116,11 +128,19 @@ ActiveRecord::Schema.define(version: 2020_10_10_200438) do
     t.string "word"
   end
 
+  create_table "split_complimentary_colors", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "tertiary_colors", force: :cascade do |t|
+    t.string "word"
+  end
+
   create_table "theatres", force: :cascade do |t|
     t.string "word"
   end
 
-  create_table "tvshows", force: :cascade do |t|
+  create_table "triadic_colors", force: :cascade do |t|
     t.string "word"
   end
 
@@ -131,6 +151,7 @@ ActiveRecord::Schema.define(version: 2020_10_10_200438) do
   create_table "users", force: :cascade do |t|
     t.string "uploader"
     t.string "channel_id"
+    t.integer "accumulated_duration"
     t.json "accumulator"
     t.datetime "accumulator_last_update"
   end

@@ -3,11 +3,13 @@
 one:
   uploader: MyString
   channel_id: MyString
+  accumulated_duration: 1
   accumulator: 
-  accumulator_last_update: 2020-10-10 21:03:59
+  accumulator_last_update: 2020-10-11 03:12:52
 
 two:
   uploader: MyString
   channel_id: MyString
+  accumulated_duration: 1
   accumulator: 
-  accumulator_last_update: 2020-10-10 21:03:59
+  accumulator_last_update: 2020-10-11 03:12:52

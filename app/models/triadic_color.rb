@@ -1,0 +1,2 @@
+class TriadicColor < ApplicationRecord
+end

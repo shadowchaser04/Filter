@@ -6,6 +6,14 @@ require 'logger'
 
 # TODO: add frequency for some words.
 # TODO: add sentences to the output, look at each paragraph or just result.
+# TODO: error handling and logging
+# TODO: make an array of subscribed. automate as a cron task the reqular down
+# load and updating of video subtitles.
+# 1. get playlist of each subscribed video.
+# 2. download the subtitles based of a date range.
+# 3. loop through each sub.
+# 4. update the total.
+# 5. schedule via a cron task.
 #------------------------------------------------------------------------------
 # methods
 #------------------------------------------------------------------------------
