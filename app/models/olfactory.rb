@@ -1,2 +1,0 @@
-class Olfactory < ApplicationRecord
-end

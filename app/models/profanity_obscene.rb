@@ -1,2 +1,0 @@
-class ProfanityObscene < ApplicationRecord
-end

@@ -1,2 +1,0 @@
-class Tvshow < ApplicationRecord
-end

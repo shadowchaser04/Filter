@@ -1,2 +1,0 @@
-class PoliticalCampaigne < ApplicationRecord
-end

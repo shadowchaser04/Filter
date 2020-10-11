@@ -1,2 +1,0 @@
-class Poet < ApplicationRecord
-end

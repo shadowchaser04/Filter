@@ -1,2 +1,0 @@
-class Ufc < ApplicationRecord
-end

@@ -1,2 +1,0 @@
-class Kinesthetic < ApplicationRecord
-end

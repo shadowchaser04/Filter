@@ -1,2 +1,0 @@
-class PosativeSentiment < ApplicationRecord
-end

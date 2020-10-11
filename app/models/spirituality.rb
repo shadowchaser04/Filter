@@ -1,2 +1,0 @@
-class Spirituality < ApplicationRecord
-end

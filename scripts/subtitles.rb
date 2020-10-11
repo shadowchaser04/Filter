@@ -4,8 +4,6 @@ require 'pry'
 require 'json'
 require 'logger'
 
-# TODO: data sets that are more than one word.
-# TODO: downcase all words going into the db.
 # TODO: add frequency for some words.
 # TODO: add sentences to the output, look at each paragraph or just result.
 #------------------------------------------------------------------------------

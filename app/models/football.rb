@@ -1,2 +1,0 @@
-class Football < ApplicationRecord
-end

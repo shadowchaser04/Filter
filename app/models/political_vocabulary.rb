@@ -1,2 +1,0 @@
-class PoliticalVocabulary < ApplicationRecord
-end
