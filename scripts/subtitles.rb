@@ -17,6 +17,15 @@ require 'logger'
 #------------------------------------------------------------------------------
 # methods
 #------------------------------------------------------------------------------
+#
+def database_exists?
+  ActiveRecord::Base.connection
+rescue ActiveRecord::NoDatabaseError
+  false
+else
+  true
+end
+
 class TimeFormatter
 
     def format_time (timeElapsed)
@@ -111,8 +120,18 @@ logger = Logger.new(STDOUT,
   end
 )
 
+# log file.
+log_to_logfile = Logger.new("logfile.log")
+
+# logger = STDOUT
 logger.info("Program started...")
 
+#------------------------------------------------------------------------------
+# Test connection to datbase is possible
+#------------------------------------------------------------------------------
+binding.pry
+log_to_logfile.info("Program Close: Database does not exist.") unless database_exists?
+exit unless database_exists?
 #------------------------------------------------------------------------------
 # remove and remake old directory
 #------------------------------------------------------------------------------
@@ -157,53 +176,56 @@ end
 #------------------------------------------------------------------------------
 # build datasets word and sentence and json information
 #------------------------------------------------------------------------------
-
 # create the hash for the subtiles
 downloaded_subs = Hash.new { |h,k| h[k] = [] }
 
 # hash for the json file data.
 json_hash = {}
 
-# get the subtitles back from the directory
+# get the subtitles back from the downloads directory
 sub_path = sub_dir(root_dir)
 
-if sub_path.count == 2
-  sub_path.each do |file|
+# instead of the usual log to STDOUT log to *.log file.
+log_to_logfile.info("SubPathError: Expected 2 files *.json and *.vtt. Found #{sub_path.count}.") unless sub_path.count == 2
 
-    # find the subtitles by there filetype.
-    if File.extname(file.split("/")[-1]) =~ /.vtt/
+# there should always be two
+exit unless sub_path.count == 2
 
-      # push the array sentences returned from the method to the hash array value.
-      (downloaded_subs['sentence']||[])<< read_file(file)
-      logger.info("created #{downloaded_subs['sentence'].flatten.count} sentences.") if downloaded_subs['sentence'].length > 0
+sub_path.each do |file|
 
-      # push the array words returned from the method to the hash array value.
-      (downloaded_subs['words']||[])<< read_file(file).join.split(" ")
-      logger.info("created #{downloaded_subs['words'].flatten.count} words.") if downloaded_subs['words'].length > 0
+  # find the subtitles by there filetype.
+  if File.extname(file.split("/")[-1]) =~ /.vtt/
 
-    elsif File.extname(file.split("/")[-1]) =~ /.json/
+    # push the array sentences returned from the method to the hash array value.
+    (downloaded_subs['sentence']||[])<< read_file(file)
+    logger.info("created #{downloaded_subs['sentence'].flatten.count} sentences.") if downloaded_subs['sentence'].length > 0
 
-      # open and parse json file
-      data = JSON.parse(File.read(file))
+    # push the array words returned from the method to the hash array value.
+    (downloaded_subs['words']||[])<< read_file(file).join.split(" ")
+    logger.info("created #{downloaded_subs['words'].flatten.count} words.") if downloaded_subs['words'].length > 0
 
-      # get the json attributes from the info.json file
-      title = data["title"]
-      json_hash['title'] = title
+  elsif File.extname(file.split("/")[-1]) =~ /.json/
 
-      # uploader information - string
-      uploader = data["uploader"]
-      json_hash['uploader'] = uploader
+    # open and parse json file
+    data = JSON.parse(File.read(file))
 
-      # uploader information - string
-      duration =  data["duration"]
-      json_hash['duration'] = duration
+    # get the json attributes from the info.json file
+    title = data["title"]
+    json_hash['title'] = title
 
-      # uploader information - string
-      channel_id  =  data["channel_id"]
-      json_hash['channel_id'] = channel_id
-    end
+    # uploader information - string
+    uploader = data["uploader"]
+    json_hash['uploader'] = uploader
 
+    # uploader information - string
+    duration =  data["duration"]
+    json_hash['duration'] = duration
+
+    # uploader information - string
+    channel_id  =  data["channel_id"]
+    json_hash['channel_id'] = channel_id
   end
+
 end
 
 #------------------------------------------------------------------------------
@@ -228,10 +250,23 @@ top_count_hash.keys.each do |k|
 end
 
 #------------------------------------------------------------------------------
-# build
+# data sets and hashes for paragraphs
 #------------------------------------------------------------------------------
+# result paragraphs
 paragraph = Hash.new { |h,k| h[k] = [] }
 
+# remove from iterating over datasets
+ignore_files = ["Blacklist", "User", "YoutubeResult"]
+
+# eager load the models keep it outsode the loop so its only called once.
+Rails.application.eager_load!
+
+# For Rails5 models are now subclasses of ApplicationRecord so to get list of all models in your app you do:
+rails_models = ApplicationRecord.descendants.collect { |type| type.name }
+
+#------------------------------------------------------------------------------
+# build paragraphs
+#------------------------------------------------------------------------------
 # build the paragrpahs
 result.each do |k,v|
   logger.info("creating paragraphs for #{blue(k)}.")
@@ -240,10 +275,7 @@ result.each do |k,v|
   v.each do |word_position|
 
     # word_position is the words indicies. 50 is then subtracted or added.
-    # Pre then denotes 50 words before the word we are looking for in the
-    # subtitles index.
-    # Pro then denotes 50 words after the word we are looking for in the
-    # subtitles index.
+    # Pre then denotes 50 words before the word Pro 50 after.
     pre = word_position - 50
     pro = word_position + 50
 
@@ -251,42 +283,25 @@ result.each do |k,v|
     if pre < 0
       pre = word_position
     end
-
     # -------------------------------------------------------------------------
     # Models
     # -------------------------------------------------------------------------
-    # remove from iterating over datasets
-    ignore_files = ["Blacklist", "User", "YoutubeResult"]
-
     # create hash for the results.
     rhash = Hash.new {|h,k| h[k] = Hash.new(0) }
 
-    # eager load the models
-    Rails.application.eager_load!
-
-    # For Rails5 models are now subclasses of ApplicationRecord so to get list of all models in your app you do:
-    rails_models = ApplicationRecord.descendants.collect { |type| type.name }
-
-    # iterates over the rails_models
-    # k is used as the primary key to show which group of topics the database
-    # is looking in. If the array_word is found it is added to the rhash and a
-    # count is incremented.
+    # rails_models = ApplicationRecord.descendants
+    # k is used as the topic primary key
+    # If the array_word is found its added to the rhash and count is incremented.
     rails_models.each do |k|
       unless ignore_files.include?(k)
-
-        sublist[pre..pro].each do |array_word|
-          rhash[k.underscore][array_word]+=1 if k.constantize.find_by(word: array_word)
-        end
-
+        sublist[pre..pro].each {|array_word| rhash[k.underscore][array_word]+=1 if k.constantize.find_by(word: array_word) }
       end
     end
-
     # -------------------------------------------------------------------------
     # blacklist
     # -------------------------------------------------------------------------
     # remove words contained in the blacklist.
     par_array = sublist[pre..pro].reject { |w| w if Blacklist.find_by(word: w) }
-
     #--------------------------------------------------------------------------
     # top words
     #--------------------------------------------------------------------------
@@ -332,12 +347,8 @@ ignore_files = ["Blacklist", "User", "YoutubeResult"]
 # create hash for the results.
 sentences = Hash.new { |h,k| h[k] = Hash.new(0) }
 
-# eager load the models
-Rails.application.eager_load!
-
-# For Rails5 models are now subclasses of ApplicationRecord so to get list of all models in your app you do:
-rails_models = ApplicationRecord.descendants.collect { |type| type.name }
-
+# the rails_models are eager_loaded at the start of the paragraph build.
+# models refers to each model found in the ApplicationRecord.descendants
 rails_models.each do |k|
   unless ignore_files.include?(k)
 
