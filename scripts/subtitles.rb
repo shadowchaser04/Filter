@@ -129,16 +129,13 @@ logger.info("Program started...")
 #------------------------------------------------------------------------------
 # Test connection to datbase is possible
 #------------------------------------------------------------------------------
-binding.pry
-log_to_logfile.info("Program Close: Database does not exist.") unless database_exists?
+log_to_logfile.error("Program Close: Database does not exist.") unless database_exists?
 exit unless database_exists?
 #------------------------------------------------------------------------------
 # remove and remake old directory
 #------------------------------------------------------------------------------
 # root directory
 root_dir = "/Users/shadowchaser/Downloads/Youtube_Subtitles/Subs"
-
-# The subtitles only excpect one subtitle in there.
 
 # remove the directory so its empty
 FileUtils.remove_dir(root_dir) if Dir.exist?(root_dir)
