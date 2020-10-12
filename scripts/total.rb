@@ -4,11 +4,11 @@ require 'pry'
 require 'json'
 require 'logger'
 
-# TODO: add total duration time. this can be used to look at frequency later.
 # TODO: add top_ten count of words.
+
 result_hash = Hash.new {|h,k| h[k] = Hash.new(0) }
 
-# iterate over each User
+# iterate over each User tallying the results of all the youtube_results.
 User.all.each do |item|
 
   # iterate over each assosiaction record belonging to the user.
@@ -18,7 +18,6 @@ User.all.each do |item|
     # the key and counting the value to the result hash.
     obj[:meta_data]['total'].each {|k,v| result_hash["#{item[:uploader]}"][k] += v }
 
-    # NOTE: may need to start with a integer
     # accumulate each of the durations.
     result_hash["#{item[:uploader]}"][:duration] += obj[:duration]
   end
@@ -29,5 +28,20 @@ end
 t = Time.now
 
 # build
-result_hash.each {|k,v| User.find_by(uploader: k).update(accumulator: v, accumulated_duration:v[:duration],  accumulator_last_update: t) }
+result_hash.each do |k,v|
+
+  # find each occurence of the user.
+  u = User.find_by(uploader: k)
+
+  # update the attributes.
+  u.update(accumulator: v, accumulated_duration:v[:duration],  accumulator_last_update: t)
+
+  # remove the duration
+  u[:accumulator].delete("duration")
+
+  # re add the hash via update.
+  u.update(accumulator: u[:accumulator])
+
+end
+
 

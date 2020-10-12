@@ -1,0 +1,2 @@
+class Actress < ApplicationRecord
+end

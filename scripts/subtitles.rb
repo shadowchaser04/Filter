@@ -20,10 +20,10 @@ require 'logger'
 #
 def database_exists?
   ActiveRecord::Base.connection
-rescue ActiveRecord::NoDatabaseError
-  false
-else
-  true
+  rescue ActiveRecord::NoDatabaseError
+    false
+  else
+    true
 end
 
 class TimeFormatter
@@ -187,7 +187,6 @@ log_to_logfile.info("SubPathError: Expected 2 files *.json and *.vtt. Found #{su
 
 # there should always be two
 exit unless sub_path.count == 2
-
 sub_path.each do |file|
 
   # find the subtitles by there filetype.
@@ -201,26 +200,6 @@ sub_path.each do |file|
     (downloaded_subs['words']||[])<< read_file(file).join.split(" ")
     logger.info("created #{downloaded_subs['words'].flatten.count} words.") if downloaded_subs['words'].length > 0
 
-  elsif File.extname(file.split("/")[-1]) =~ /.json/
-
-    # open and parse json file
-    data = JSON.parse(File.read(file))
-
-    # get the json attributes from the info.json file
-    title = data["title"]
-    json_hash['title'] = title
-
-    # uploader information - string
-    uploader = data["uploader"]
-    json_hash['uploader'] = uploader
-
-    # uploader information - string
-    duration =  data["duration"]
-    json_hash['duration'] = duration
-
-    # uploader information - string
-    channel_id  =  data["channel_id"]
-    json_hash['channel_id'] = channel_id
   end
 
 end
@@ -389,6 +368,7 @@ paragraph.each do |top_key, arr|
     topic_array[2].each { |k,v| all_topics[k] += v.values.sum }
   end
 end
+
 #------------------------------------------------------------------------------
 # format
 #------------------------------------------------------------------------------
@@ -405,9 +385,18 @@ all_topics.each {|k,v| puts "#{k} -> #{v} \n" }
 div
 
 #------------------------------------------------------------------------------
+# retrive json data
+#------------------------------------------------------------------------------
+# there are two files in the sub_path. *.json, *.vtt
+# select the json returning an array.
+file = sub_path.select {|f| f if File.extname(f.split("/")[-1]) =~ /.json/ }
+
+# open and parse json file
+data = JSON.parse(File.read(file[0]))
+#------------------------------------------------------------------------------
 # format
 #------------------------------------------------------------------------------
-yt_user = User.find_or_create_by(uploader: json_hash['uploader'], channel_id: json_hash['channel_id'])
-re = yt_user.youtube_results.find_or_create_by(title: json_hash['title'])
-re.update(duration: json_hash['duration'], meta_data: {total: all_topics, top_count: top_count_hash})
+yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
+re = yt_user.youtube_results.find_or_create_by(title: data['title'])
+re.update(duration: data['duration'], meta_data: {total: all_topics, top_count: top_count_hash})
 

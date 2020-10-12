@@ -10,9 +10,13 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2020_10_11_021338) do
+ActiveRecord::Schema.define(version: 2020_10_11_204800) do
 
   create_table "actors", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "actresses", force: :cascade do |t|
     t.string "word"
   end
 
