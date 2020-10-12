@@ -38,7 +38,7 @@ namespace :subtitle do
 
   desc "create the user model"
   task user: :environment do
-    sh "rails g model User uploader:string channel_id:string accumulated_duration:integer accumulator:json accumulator_last_update:datetime --no-timestamps"
+    sh "rails g model User uploader:string channel_id:string video_count:integer accumulated_duration:integer accumulator:json accumulator_last_update:datetime --no-timestamps"
   end
 
   desc "create the result model"

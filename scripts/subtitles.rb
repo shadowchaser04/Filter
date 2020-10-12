@@ -4,6 +4,7 @@ require 'pry'
 require 'json'
 require 'logger'
 
+binding.pry
 # TODO: add frequency for some words.
 # TODO: add sentences to the output, look at each paragraph or just result.
 # TODO: error handling and logging
@@ -20,10 +21,10 @@ require 'logger'
 #
 def database_exists?
   ActiveRecord::Base.connection
-  rescue ActiveRecord::NoDatabaseError
-    false
-  else
-    true
+rescue ActiveRecord::NoDatabaseError
+  false
+else
+  true
 end
 
 class TimeFormatter
@@ -145,6 +146,7 @@ logger.info("removed #{root_dir}") if !Dir.exist?(root_dir)
 FileUtils.mkdir(root_dir) if !Dir.exist?(root_dir)
 logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 
+binding.pry
 #------------------------------------------------------------------------------
 # take user input
 #------------------------------------------------------------------------------
