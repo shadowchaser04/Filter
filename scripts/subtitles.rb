@@ -210,6 +210,8 @@ result = Hash.new {|h,k| h[k] = [] }
 # flatten out the array of arrays
 sublist = downloaded_subs['words'].flatten
 
+#NOTE: if the database has not been created this will be the first point it
+#falls
 # remove blacklist words from the array if they are found in the database.
 subs = sublist.reject { |w| w if Blacklist.find_by(word: w) }
 
@@ -332,7 +334,12 @@ rails_models.each do |k|
 
     model_array.each do |word|
       if word.split.count > 1
-        sen.each {|s| sentences[k][word] += 1 if s.include?(word) }
+
+        # scan the whole array. return each occurance of the  word match
+        found_array = sen.join.scan(/#{word}/)
+
+        sentences[k][word] = found_array.count if found_array.count > 0
+        #sen.each {|line| sentences[k][word] += 1 if line.include?(word) }
       end
     end
 
