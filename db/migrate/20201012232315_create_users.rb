@@ -3,6 +3,7 @@ class CreateUsers < ActiveRecord::Migration[6.0]
     create_table :users do |t|
       t.string :uploader
       t.string :channel_id
+      t.integer :video_count
       t.integer :accumulated_duration
       t.json :accumulator
       t.datetime :accumulator_last_update

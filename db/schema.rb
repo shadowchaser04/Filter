@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2020_10_11_204800) do
+ActiveRecord::Schema.define(version: 2020_10_12_232360) do
 
   create_table "actors", force: :cascade do |t|
     t.string "word"
@@ -155,6 +155,7 @@ ActiveRecord::Schema.define(version: 2020_10_11_204800) do
   create_table "users", force: :cascade do |t|
     t.string "uploader"
     t.string "channel_id"
+    t.integer "video_count"
     t.integer "accumulated_duration"
     t.json "accumulator"
     t.datetime "accumulator_last_update"

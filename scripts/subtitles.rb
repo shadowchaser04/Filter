@@ -4,7 +4,6 @@ require 'pry'
 require 'json'
 require 'logger'
 
-binding.pry
 # TODO: add frequency for some words.
 # TODO: add sentences to the output, look at each paragraph or just result.
 # TODO: error handling and logging
@@ -146,7 +145,6 @@ logger.info("removed #{root_dir}") if !Dir.exist?(root_dir)
 FileUtils.mkdir(root_dir) if !Dir.exist?(root_dir)
 logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 
-binding.pry
 #------------------------------------------------------------------------------
 # take user input
 #------------------------------------------------------------------------------
@@ -401,4 +399,8 @@ data = JSON.parse(File.read(file[0]))
 yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
 re = yt_user.youtube_results.find_or_create_by(title: data['title'])
 re.update(duration: data['duration'], meta_data: {total: all_topics, top_count: top_count_hash})
+
+
+
+
 

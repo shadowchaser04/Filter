@@ -27,6 +27,6 @@ User.all.each do |item|
   end
 
   # add the count to the video_count attribute and update the last updated
-  # accumulated_duration attribute.
-  item.update(video_count: item.youtube_results.count, accumulator_last_update: Time.now)
+  # accumulated_duration attribute. Lastly re add the hash to accumulator.
+  item.update(video_count: item.youtube_results.count, accumulator_last_update: Time.now, accumulator: result_hash["#{item[:uploader]}"])
 end
