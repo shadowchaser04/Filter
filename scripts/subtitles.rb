@@ -4,8 +4,6 @@ require 'pry'
 require 'json'
 require 'logger'
 
-# TODO: add frequency for some words.
-# TODO: add sentences to the output, look at each paragraph or just result.
 # TODO: error handling and logging
 # TODO: make an array of subscribed. automate as a cron task the reqular down
 # load and updating of video subtitles.
