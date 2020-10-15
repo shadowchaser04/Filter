@@ -57,7 +57,7 @@ end
 class Array
   # Counts each occurence of the word by the group_by method and hashes the result.
   def count_and_hash(result=10)
-    self.group_by(&:itself).transform_values(&:count).sort_by{|k, v| v}.reverse.first(result).to_h
+    self.group_by(&:itself).transform_values(&:count).sort_by{|k, v| v}.reverse.first(result).to_h.symbolize_keys
   end
 end
 
@@ -202,6 +202,9 @@ sub_path.each do |file|
 
 end
 
+# add a subtitles table
+# build the data.
+
 #------------------------------------------------------------------------------
 # remove blasklist
 #------------------------------------------------------------------------------
@@ -218,11 +221,25 @@ subs = sublist.reject { |w| w if Blacklist.find_by(word: w) }
 # group the words by themselfs then count the words, sort and turn into a hash
 top_count_hash = subs.count_and_hash(10)
 
-# top_count_hash iterates over the keys
-# sublist iterates over each word of the subtitles. Each word it matches it stores
-# the indices in the hash=result value array.
+#------------------------------------------------------------------------------
+# create paragraph
+#------------------------------------------------------------------------------
 top_count_hash.keys.each do |k|
-  sublist.each_with_index {|word,i| (result[k]||[]) << i if word =~ /#{k}/ }
+  # loops over the top ten found words, group_by groups all the nested array words
+  # and there index's. This creates a key and an array. The array contains all
+  # occurrence of the word and its index position.
+  subs = sublist.each_with_index.map {|w,i| [w,i] }.group_by {|i| i[0] }
+
+  # k is queried in the hash, if found it returns an array which is flattened.
+  # it is mapped returning only the integers which are the index positions of
+  # the words.
+  subs_ints = subs["#{k}"].flatten.map {|x| Integer(x) rescue nil }.compact
+
+  # subs_ints is remapped perminantly altering the array. first it creates a
+  # range of 50 words before and after i. which is its index position. These
+  # are then joined into the paragraph.
+  subs_ints.map! {|i| pre = i - 50; pro = i + 50; sublist[pre..pro].join(" ") }
+  subs_ints.each {|paragraph| (result[:"#{k}"]||[]) << paragraph }
 end
 
 #------------------------------------------------------------------------------
@@ -241,171 +258,47 @@ Rails.application.eager_load!
 rails_models = ApplicationRecord.descendants.collect { |type| type.name }
 
 #------------------------------------------------------------------------------
-# build paragraphs
+# Dataset
 #------------------------------------------------------------------------------
-# build the paragrpahs
-result.each do |k,v|
-  logger.info("creating paragraphs for #{blue(k)}.")
+# loop over each dataset
+result.each do |k, paragraph_array|
+  logger.info("paragraph count is #{paragraph_array.count} for #{k}")
 
-  # value array that corrisponds to each key
-  v.each do |word_position|
+  # loop each individual paragraph belonging to a key.
+  paragraph_array.flatten.each do |para|
 
-    # word_position is the words indicies. 50 is then subtracted or added.
-    # Pre then denotes 50 words before the word Pro 50 after.
-    pre = word_position - 50
-    pro = word_position + 50
+    # create the hash each iteration.
+    rhash = Hash.new { |h,k| h[k] = Hash.new(0) }
 
-    # if pre is a minus set the variable to just the word_position
-    if pre < 0
-      pre = word_position
-    end
-    # -------------------------------------------------------------------------
-    # Models
-    # -------------------------------------------------------------------------
-    # create hash for the results.
-    rhash = Hash.new {|h,k| h[k] = Hash.new(0) }
+    # hash the para array and count.
+    subs = para.split(" ").group_by(&:itself).transform_values(&:count).to_h
 
-    # rails_models = ApplicationRecord.descendants
-    # k is used as the topic primary key
-    # If the array_word is found its added to the rhash and count is incremented.
-    rails_models.each do |k|
-      unless ignore_files.include?(k)
-        sublist[pre..pro].each {|array_word| rhash[k.underscore][array_word]+=1 if k.constantize.find_by(word: array_word) }
+    rails_models.each do |dataset|
+      logger.info("currently searching #{dataset}")
+      unless ignore_files.include?(dataset)
+          # create a array of words from the datbase.
+        if dataset.constantize.where(word: subs.keys).present?
+
+          # where takes an array. in this case each key from the subs.keys
+          # hash. and returns an array in one call of each found word.
+          found_words = dataset.constantize.where(word: subs.keys)
+
+          # loop over the found words. creating the hash per paragraph.
+          found_words.each { |word| rhash["#{dataset.underscore}"][word[:word]] = subs[word[:word]] }
+        end
       end
     end
-    # -------------------------------------------------------------------------
-    # blacklist
-    # -------------------------------------------------------------------------
-    # remove words contained in the blacklist.
-    par_array = sublist[pre..pro].reject { |w| w if Blacklist.find_by(word: w) }
-    #--------------------------------------------------------------------------
-    # top words
-    #--------------------------------------------------------------------------
-    # hash count the words of the paragrpahs
-    top_ten_paragraph_words = par_array.count_and_hash(10)
-
-    # count the syllables of each remaining word after the blacklist ahs been
-    # removed and add the words over three syllables.
-    high_syllables = par_array.delete_if {|word| syllable_count(word) < 3 }.count_and_hash(10)
-
-    # remove the duplicates
-    top_ten_paragraph_words.keys.each {|key| high_syllables.delete(key) }
-
-    # merge the two hashes
-    top_words = top_ten_paragraph_words.merge(high_syllables)
-
-    #--------------------------------------------------------------------------
-    # count all values
-    #--------------------------------------------------------------------------
-    counted = Hash.new(0)
-    count_result = Hash.new(0)
-
-    rhash.keys.each {|k| rhash.dup[k].each {|key,val| counted[k] += val } }
-    counted.each {|k,v| count_result[:total] += v }
-
-    #--------------------------------------------------------------------------
-    # build paragraphs
-    #--------------------------------------------------------------------------
-    # use a range pre..pro to find the subtitles and join the words.
-    # paragraphs <- array of paragraphs, counted words, topics, and a total of topics.
-    (paragraph[k]||[]) << [sublist[pre..pro].join(" "), top_words, rhash, count_result]
-
-  end
-
-end
-
-#------------------------------------------------------------------------------
-# sentences
-#------------------------------------------------------------------------------
-# remove from iterating over datasets
-ignore_files = ["Blacklist", "User", "YoutubeResult"]
-
-# create hash for the results.
-sentences = Hash.new { |h,k| h[k] = Hash.new(0) }
-
-# the rails_models are eager_loaded at the start of the paragraph build.
-# models refers to each model found in the ApplicationRecord.descendants
-rails_models.each do |k|
-  unless ignore_files.include?(k)
-
-    # pluck words from each model.
-    model_array = k.constantize.pluck(:word)
-    sen = downloaded_subs['sentence'].flatten
-
-    model_array.each do |word|
-      if word.split.count > 1
-
-        # scan the whole array. return each occurance of the  word match
-        found_array = sen.join.scan(/#{word}/)
-
-        sentences[k][word] = found_array.count if found_array.count > 0
-        #sen.each {|line| sentences[k][word] += 1 if line.include?(word) }
-      end
-    end
-
+    (paragraph["#{k}"]||[]) << [para,rhash]
+    puts div
   end
 end
+binding.pry
 
-#------------------------------------------------------------------------------
-# rank the paragraphs - highest total
-#------------------------------------------------------------------------------
-new_par = Hash.new {|h,k| h[k] = [] }
-
-# paragraphs_array
-# 1) paragraph
-# 2) top ten words count
-# 3) hash of database words counted
-paragraph.each do |k,arr|
-  (new_par[k]||[]) << arr.sort_by {|paragraph_array| paragraph_array[3][:total] }
-end
-
-#------------------------------------------------------------------------------
-# total the topics
-#------------------------------------------------------------------------------
-all_topics = Hash.new(0)
-
-# paragraphs_array
-    # 0) paragraph
-    # 1) topten
-    # 2) hash
-paragraph.each do |top_key, arr|
-  arr.each do |topic_array|
-    topic_array[2].each { |k,v| all_topics[k] += v.values.sum }
+paragraph.each do |k,v|
+  puts "#{k})\n"
+  v.each_with_index do |par,i|
+    puts "#{i}) #{par}\n"
   end
 end
-
-#------------------------------------------------------------------------------
-# format
-#------------------------------------------------------------------------------
-new_par.each do |k,paragraph|
-  puts "\n"
-  puts "#{blue(k)} -> #{paragraph[0].count})\n"
-  paragraph[0].each_with_index { |p,i| puts "\n" + "#{i}) #{p[0]} \n #{p[1]} \n #{p[2]} \n #{p[3]}" }
-  div
-end
-puts "sentences"
-puts sentences
-div
-all_topics.each {|k,v| puts "#{k} -> #{v} \n" }
-div
-
-#------------------------------------------------------------------------------
-# retrive json data
-#------------------------------------------------------------------------------
-# there are two files in the sub_path. *.json, *.vtt
-# select the json returning an array.
-file = sub_path.select {|f| f if File.extname(f.split("/")[-1]) =~ /.json/ }
-
-# open and parse json file
-data = JSON.parse(File.read(file[0]))
-#------------------------------------------------------------------------------
-# format
-#------------------------------------------------------------------------------
-yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
-re = yt_user.youtube_results.find_or_create_by(title: data['title'])
-re.update(duration: data['duration'], meta_data: {total: all_topics, top_count: top_count_hash})
-
-
-
-
-
+binding.pry
+puts "jungle is massive"
