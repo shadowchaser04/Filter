@@ -238,7 +238,7 @@ top_count_hash.keys.each do |k|
   # subs_ints is remapped perminantly altering the array. first it creates a
   # range of 50 words before and after i. which is its index position. These
   # are then joined into the paragraph.
-  subs_ints.map! {|i| pre = i - 50; pro = i + 50; sublist[pre..pro].join(" ") }
+  subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; sublist[pre..pro].join(" ") }
   subs_ints.each {|paragraph| (result[:"#{k}"]||[]) << paragraph }
 end
 
@@ -258,7 +258,7 @@ Rails.application.eager_load!
 rails_models = ApplicationRecord.descendants.collect { |type| type.name }
 
 #------------------------------------------------------------------------------
-# Dataset
+# Dataset words
 #------------------------------------------------------------------------------
 # loop over each dataset
 result.each do |k, paragraph_array|
@@ -273,11 +273,13 @@ result.each do |k, paragraph_array|
     # hash the para array and count.
     subs = para.split(" ").group_by(&:itself).transform_values(&:count).to_h
 
+    # rails_models are each dataset the words will be ran against.
     rails_models.each do |dataset|
-      logger.info("currently searching #{dataset}")
       unless ignore_files.include?(dataset)
+
           # create a array of words from the datbase.
         if dataset.constantize.where(word: subs.keys).present?
+          logger.info("currently searching #{dataset}")
 
           # where takes an array. in this case each key from the subs.keys
           # hash. and returns an array in one call of each found word.
@@ -288,17 +290,16 @@ result.each do |k, paragraph_array|
         end
       end
     end
+    # add the paragraph and dataset hash back into the array under its key
     (paragraph["#{k}"]||[]) << [para,rhash]
     puts div
   end
 end
-binding.pry
 
 paragraph.each do |k,v|
   puts "#{k})\n"
   v.each_with_index do |par,i|
-    puts "#{i}) #{par}\n"
+    puts "#{i}) #{par}"
+    puts "\n"
   end
 end
-binding.pry
-puts "jungle is massive"
