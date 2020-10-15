@@ -303,3 +303,23 @@ paragraph.each do |k,v|
     puts "\n"
   end
 end
+
+#------------------------------------------------------------------------------
+# retrive json data
+#------------------------------------------------------------------------------
+# there are two files in the sub_path. *.json, *.vtt
+# select the json returning an array.
+file = sub_path.select {|f| f if File.extname(f.split("/")[-1]) =~ /.json/ }
+
+# open and parse json file
+data = JSON.parse(File.read(file[0]))
+
+# TODO: meta_data needs to be added.
+# TODO: rank by sort of the hash needs to be done.
+#------------------------------------------------------------------------------
+# format
+#------------------------------------------------------------------------------
+yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
+re = yt_user.youtube_results.find_or_create_by(title: data['title'])
+re.update(duration: data['duration'], meta_data: {total: [], top_count: []})
+
