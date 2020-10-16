@@ -1,0 +1,2 @@
+class FastFood < ApplicationRecord
+end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2020_10_12_232360) do
+ActiveRecord::Schema.define(version: 2020_10_16_042740) do
 
   create_table "actors", force: :cascade do |t|
     t.string "word"
@@ -33,6 +33,14 @@ ActiveRecord::Schema.define(version: 2020_10_12_232360) do
   end
 
   create_table "boxers", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "boy_names", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "boys", force: :cascade do |t|
     t.string "word"
   end
 
@@ -60,7 +68,19 @@ ActiveRecord::Schema.define(version: 2020_10_12_232360) do
     t.string "word"
   end
 
+  create_table "fast_foods", force: :cascade do |t|
+    t.string "word"
+  end
+
   create_table "footballs", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "girl_names", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "girls", force: :cascade do |t|
     t.string "word"
   end
 

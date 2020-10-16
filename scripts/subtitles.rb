@@ -290,13 +290,60 @@ result.each do |k, paragraph_array|
         end
       end
     end
+    #--------------------------------------------------------------------------
+    # top words
+    #--------------------------------------------------------------------------
+    # hash count the words of the paragrpahs
+    top_ten_paragraph_words = para.split(" ").count_and_hash(10)
+    #--------------------------------------------------------------------------
+    # count all values
+    #--------------------------------------------------------------------------
+    counted = Hash.new(0)
+    count_result = Hash.new(0)
+
+    rhash.keys.each {|k| rhash.dup[k].each {|key,val| counted[k] += val } }
+    counted.each {|k,v| count_result[:rank] += v }
+    #--------------------------------------------------------------------------
+    # build paragraph
+    #--------------------------------------------------------------------------
     # add the paragraph and dataset hash back into the array under its key
-    (paragraph["#{k}"]||[]) << [para,rhash]
+    (paragraph["#{k}"]||[]) << [para, top_ten_paragraph_words, rhash, count_result]
     puts div
   end
 end
 
-paragraph.each do |k,v|
+#------------------------------------------------------------------------------
+# rank the paragraphs - highest total
+#------------------------------------------------------------------------------
+new_par = Hash.new {|h,k| h[k] = [] }
+
+# paragraphs_array
+# 1) paragraph
+# 2) top ten words count
+# 3) hash of database words counted
+paragraph.each do |k,arr|
+  new_par[k] = arr.sort_by {|paragraph_array| paragraph_array[3][:rank] }
+end
+
+#------------------------------------------------------------------------------
+# total the topics
+#------------------------------------------------------------------------------
+all_topics = Hash.new(0)
+
+# paragraphs_array
+    # 0) paragraph
+    # 1) topten
+    # 2) hash
+paragraph.each do |top_key, arr|
+  arr.each do |topic_array|
+    topic_array[2].each { |k,v| all_topics[k] += v.values.sum }
+  end
+end
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+new_par.each do |k,v|
   puts "#{k})\n"
   v.each_with_index do |par,i|
     puts "#{i}) #{par}"
@@ -321,5 +368,5 @@ data = JSON.parse(File.read(file[0]))
 #------------------------------------------------------------------------------
 yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
 re = yt_user.youtube_results.find_or_create_by(title: data['title'])
-re.update(duration: data['duration'], meta_data: {total: [], top_count: []})
+re.update(duration: data['duration'], meta_data: {total: all_topics, top_count: top_count_hash})
 
