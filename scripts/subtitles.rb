@@ -277,6 +277,12 @@ result.each do |k, paragraph_array|
     rails_models.each do |dataset|
       unless ignore_files.include?(dataset)
 
+        #----------------------------------------------------------------------
+        #----------------------------------------------------------------------
+        #
+        ds = dataset.constantize.pluck(:word).keep_if {|x| x.length > 1 }
+        ds.each {|x| rhash["#{dataset.underscore}"][x] = para.scan(/#{x}/).count if para.scan(/#{x}/).count > 1 }
+
           # create a array of words from the datbase.
         if dataset.constantize.where(word: subs.keys).present?
           logger.info("currently searching #{dataset}")
