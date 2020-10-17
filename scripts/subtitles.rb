@@ -15,7 +15,6 @@ require 'logger'
 #------------------------------------------------------------------------------
 # methods
 #------------------------------------------------------------------------------
-#
 def database_exists?
   ActiveRecord::Base.connection
 rescue ActiveRecord::NoDatabaseError
@@ -24,28 +23,6 @@ else
   true
 end
 
-class TimeFormatter
-
-    def format_time (timeElapsed)
-
-        @timeElapsed = timeElapsed
-
-        #find the seconds
-        seconds = @timeElapsed % 60
-
-        #find the minutes
-        minutes = (@timeElapsed / 60) % 60
-
-        #find the hours
-        hours = (@timeElapsed/3600)
-
-        #format the time
-
-        return hours.to_s + ":" + format("%02d",minutes.to_s) + ":" + format("%02d",seconds.to_s)
-    end
-end
-
-#
 def syllable_count(word)
   word.downcase!
   return 1 if word.length <= 3
@@ -85,7 +62,6 @@ def read_file(arg)
   aa.reject { |item| item.nil? || item == '  ' || item == ' ' || item == '\n' || item == ' \n' }
 end
 
-#
 def div
   puts "-"*50
 end
@@ -211,9 +187,6 @@ sub_path.each do |file|
   end
 
 end
-
-# add a subtitles table
-# build the data.
 
 #------------------------------------------------------------------------------
 # remove blasklist
@@ -387,7 +360,6 @@ end
 # select the json returning an array.
 file = sub_path.select {|f| f if File.extname(f.split("/")[-1]) =~ /.json/ }
 
-binding.pry
 if file.class == Array && file[0] =~ /.json/
   # open and parse json file
   data = JSON.parse(File.read(file[0]))
@@ -396,6 +368,7 @@ else
   logger.error("Error: no j.son data - check log for more thorough explanation")
   exit
 end
+
 #------------------------------------------------------------------------------
 # format
 #------------------------------------------------------------------------------
