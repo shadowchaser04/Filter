@@ -10,3 +10,4 @@ I, [2020-10-13T08:21:50.690589 #18403]  INFO -- : SubPathError: Expected 2 files
 I, [2020-10-15T04:04:06.300841 #35370]  INFO -- : SubPathError: Expected 2 files *.json and *.vtt. Found 0.
 I, [2020-10-15T04:25:08.392872 #35808]  INFO -- : SubPathError: Expected 2 files *.json and *.vtt. Found 0.
 I, [2020-10-15T12:53:51.989506 #40873]  INFO -- : SubPathError: Expected 2 files *.json and *.vtt. Found 1.
+E, [2020-10-17T06:03:28.443118 #54210] ERROR -- : 0 datasets were found.

@@ -251,12 +251,23 @@ paragraph = Hash.new { |h,k| h[k] = [] }
 # remove from iterating over datasets
 ignore_files = ["Blacklist", "User", "YoutubeResult"]
 
-# eager load the models keep it outsode the loop so its only called once.
+#------------------------------------------------------------------------------
+# Load datasets
+#------------------------------------------------------------------------------
+# eager load the models keep it outside the loop so its only called once.
 Rails.application.eager_load!
 
-# For Rails5 models are now subclasses of ApplicationRecord so to get list of all models in your app you do:
+# For Rails5 models are now subclasses of ApplicationRecord so to get the list
+# of all models in your app you do:
 rails_models = ApplicationRecord.descendants.collect { |type| type.name }
 
+# if datasets are not present exit and log otherwise print the count to screen.
+if rails_models.present?
+  logger.info("found #{rails_models.count} datasets")
+else
+  log_to_logfile.error("#{rails_models.count} datasets were found.")
+  exit
+end
 #------------------------------------------------------------------------------
 # Dataset words
 #------------------------------------------------------------------------------
@@ -278,9 +289,12 @@ result.each do |k, paragraph_array|
       unless ignore_files.include?(dataset)
 
         #----------------------------------------------------------------------
+        # words and sentance
         #----------------------------------------------------------------------
-        #
-        ds = dataset.constantize.pluck(:word).keep_if {|x| x.length > 1 }
+        # pluck all the words form the dataset. Filter out any words leaving
+        # only sentences. loop over each sentence, scanning the paragraph of
+        # text (which is a string) for all occurrences of the sentence.
+        ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
         ds.each {|x| rhash["#{dataset.underscore}"][x] = para.scan(/#{x}/).count if para.scan(/#{x}/).count > 1 }
 
           # create a array of words from the datbase.
@@ -345,7 +359,6 @@ paragraph.each do |top_key, arr|
     topic_array[2].each { |k,v| all_topics[k] += v.values.sum }
   end
 end
-
 #------------------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
@@ -356,7 +369,6 @@ new_par.each do |k,v|
     puts "\n"
   end
 end
-
 #------------------------------------------------------------------------------
 # retrive json data
 #------------------------------------------------------------------------------
@@ -366,9 +378,6 @@ file = sub_path.select {|f| f if File.extname(f.split("/")[-1]) =~ /.json/ }
 
 # open and parse json file
 data = JSON.parse(File.read(file[0]))
-
-# TODO: meta_data needs to be added.
-# TODO: rank by sort of the hash needs to be done.
 #------------------------------------------------------------------------------
 # format
 #------------------------------------------------------------------------------
