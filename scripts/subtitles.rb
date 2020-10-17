@@ -128,8 +128,17 @@ logger.info("Program started...")
 # Test connection to datbase is possible
 #------------------------------------------------------------------------------
 log_to_logfile.error("Program Close: Database does not exist.") unless database_exists?
-binding.pry
 exit unless database_exists?
+
+# test whether then db returns true or false on the user or kicks an error.
+begin
+  User.all.present?
+rescue ActiveRecord::StatementInvalid => e
+  puts "#{e}"
+  puts "check the datbase has been created by running. rake subtitle:full_build"
+  log_to_logfile.error("Program Closed: Database does not exist.")
+  exit
+end
 #------------------------------------------------------------------------------
 # remove and remake old directory
 #------------------------------------------------------------------------------
@@ -214,8 +223,6 @@ result = Hash.new {|h,k| h[k] = [] }
 # flatten out the array of arrays
 sublist = downloaded_subs['words'].flatten
 
-#NOTE: if the database has not been created this will be the first point it
-#falls
 # remove blacklist words from the array if they are found in the database.
 subs = sublist.reject { |w| w if Blacklist.find_by(word: w) }
 
@@ -300,7 +307,6 @@ result.each do |k, paragraph_array|
 
           # create a array of words from the database.
         if dataset.constantize.where(word: subs.keys).present?
-          logger.info("currently searching #{dataset}")
 
           # where takes an array. In this case each key from the subs.keys
           # hash. And returns an array in one call of each found word.
@@ -319,6 +325,7 @@ result.each do |k, paragraph_array|
     #--------------------------------------------------------------------------
     # count all values
     #--------------------------------------------------------------------------
+    # count the topics so as to rank the result based on the count.
     counted = Hash.new(0)
     count_result = Hash.new(0)
 
@@ -329,7 +336,6 @@ result.each do |k, paragraph_array|
     #--------------------------------------------------------------------------
     # add the paragraph and dataset hash back into the array under its key
     (paragraph[k]||[]) << [para, top_ten_paragraph_words, rhash, count_result]
-    puts div
   end
 end
 
@@ -381,8 +387,15 @@ end
 # select the json returning an array.
 file = sub_path.select {|f| f if File.extname(f.split("/")[-1]) =~ /.json/ }
 
-# open and parse json file
-data = JSON.parse(File.read(file[0]))
+binding.pry
+if file.class == Array && file[0] =~ /.json/
+  # open and parse json file
+  data = JSON.parse(File.read(file[0]))
+else
+  log_to_logfile.error("RetriveJsonDataError: program closed due to #{file} error. no .json file.")
+  logger.error("Error: no j.son data - check log for more thorough explanation")
+  exit
+end
 #------------------------------------------------------------------------------
 # format
 #------------------------------------------------------------------------------
