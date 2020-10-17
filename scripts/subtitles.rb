@@ -79,7 +79,7 @@ def read_file(arg)
       line.gsub!(/<[^>]*>/, "")
       sanatised << line.gsub(/([^\w\s]|([0-9]|\:|\.))/, "").downcase
   end
-  # removedup lines with uniq then clean up formatting.
+  # remove dup lines with uniq then clean up formatting.
   aa = sanatised.uniq
   # reject any nil or empty strings
   aa.reject { |item| item.nil? || item == '  ' || item == ' ' || item == '\n' || item == ' \n' }
@@ -128,6 +128,7 @@ logger.info("Program started...")
 # Test connection to datbase is possible
 #------------------------------------------------------------------------------
 log_to_logfile.error("Program Close: Database does not exist.") unless database_exists?
+binding.pry
 exit unless database_exists?
 #------------------------------------------------------------------------------
 # remove and remake old directory
@@ -147,7 +148,7 @@ logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 # take user input
 #------------------------------------------------------------------------------
 
-# loop infinitly until the youtube address passes validation the exit
+# loop infinitely until the youtube address passes validation the exit
 while 0
 
   # take youtube https
@@ -171,7 +172,7 @@ end
 #------------------------------------------------------------------------------
 # build datasets word and sentence and json information
 #------------------------------------------------------------------------------
-# create the hash for the subtiles
+# create the hash for the subtitles
 downloaded_subs = Hash.new { |h,k| h[k] = [] }
 
 # hash for the json file data.
@@ -218,7 +219,7 @@ sublist = downloaded_subs['words'].flatten
 # remove blacklist words from the array if they are found in the database.
 subs = sublist.reject { |w| w if Blacklist.find_by(word: w) }
 
-# group the words by themselfs then count the words, sort and turn into a hash
+# group the words by themselves then count the words, sort and turn into a hash
 top_count_hash = subs.count_and_hash(10)
 
 #------------------------------------------------------------------------------
@@ -235,8 +236,8 @@ top_count_hash.keys.each do |k|
   # the words.
   subs_ints = subs["#{k}"].flatten.map {|x| Integer(x) rescue nil }.compact
 
-  # subs_ints is remapped perminantly altering the array. first it creates a
-  # range of 50 words before and after i. which is its index position. These
+  # subs_ints is remapped permanently altering the array. First it creates a
+  # range of 50 words before and after i. Which is its index position. These
   # are then joined into the paragraph.
   subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; sublist[pre..pro].join(" ") }
   subs_ints.each {|paragraph| (result[:"#{k}"]||[]) << paragraph }
@@ -289,23 +290,23 @@ result.each do |k, paragraph_array|
       unless ignore_files.include?(dataset)
 
         #----------------------------------------------------------------------
-        # words and sentance
+        # words and sentence
         #----------------------------------------------------------------------
         # pluck all the words form the dataset. Filter out any words leaving
-        # only sentences. loop over each sentence, scanning the paragraph of
+        # only sentences. Loop over each sentence, scanning the paragraph of
         # text (which is a string) for all occurrences of the sentence.
         ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
-        ds.each {|x| rhash["#{dataset.underscore}"][x] = para.scan(/#{x}/).count if para.scan(/#{x}/).count > 1 }
+        ds.each {|x| rhash["#{dataset.underscore}"]["#{x}"] = para.scan(/#{x}/).count if para.scan(/#{x}/).count > 1 }
 
-          # create a array of words from the datbase.
+          # create a array of words from the database.
         if dataset.constantize.where(word: subs.keys).present?
           logger.info("currently searching #{dataset}")
 
-          # where takes an array. in this case each key from the subs.keys
-          # hash. and returns an array in one call of each found word.
+          # where takes an array. In this case each key from the subs.keys
+          # hash. And returns an array in one call of each found word.
           found_words = dataset.constantize.where(word: subs.keys)
 
-          # loop over the found words. creating the hash per paragraph.
+          # loop over the found words. Creating the hash per paragraph.
           found_words.each { |word| rhash["#{dataset.underscore}"][word[:word]] = subs[word[:word]] }
         end
       end
@@ -313,7 +314,7 @@ result.each do |k, paragraph_array|
     #--------------------------------------------------------------------------
     # top words
     #--------------------------------------------------------------------------
-    # hash count the words of the paragrpahs
+    # hash count the words of the paragraphs
     top_ten_paragraph_words = para.split(" ").count_and_hash(10)
     #--------------------------------------------------------------------------
     # count all values
@@ -327,7 +328,7 @@ result.each do |k, paragraph_array|
     # build paragraph
     #--------------------------------------------------------------------------
     # add the paragraph and dataset hash back into the array under its key
-    (paragraph["#{k}"]||[]) << [para, top_ten_paragraph_words, rhash, count_result]
+    (paragraph[k]||[]) << [para, top_ten_paragraph_words, rhash, count_result]
     puts div
   end
 end
@@ -359,16 +360,20 @@ paragraph.each do |top_key, arr|
     topic_array[2].each { |k,v| all_topics[k] += v.values.sum }
   end
 end
+
 #------------------------------------------------------------------------------
-#
+# symbolize
 #------------------------------------------------------------------------------
-new_par.each do |k,v|
+# symbolz are quicker, have a uniq id.
+paragraph_symbolz = new_par.deep_symbolize_keys
+paragraph_symbolz.each do |k,v|
   puts "#{k})\n"
   v.each_with_index do |par,i|
     puts "#{i}) #{par}"
     puts "\n"
   end
 end
+
 #------------------------------------------------------------------------------
 # retrive json data
 #------------------------------------------------------------------------------
