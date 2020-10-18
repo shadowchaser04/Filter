@@ -4,7 +4,6 @@ require 'pry'
 require 'json'
 require 'logger'
 
-# TODO: error handling and logging
 # TODO: make an array of subscribed. automate as a cron task the reqular down
 # load and updating of video subtitles.
 # 1. get playlist of each subscribed video.
@@ -12,6 +11,40 @@ require 'logger'
 # 3. loop through each sub.
 # 4. update the total.
 # 5. schedule via a cron task.
+
+# {{{1 format
+#------------------------------------------------------------------------------
+# format
+#------------------------------------------------------------------------------
+def div
+  puts "-"*50
+end
+
+def blue(color)
+  "\e[34m#{color}\e[0m"
+end
+# }}}
+# {{{1 logger
+#------------------------------------------------------------------------------
+# logger
+#------------------------------------------------------------------------------
+# log app status's
+logger = Logger.new(STDOUT,
+  level: Logger::INFO,
+  progname: 'youtube',
+  datetime_format: '%Y-%m-%d %H:%M:%S',
+  formatter: proc do |severity, datetime, progname, msg|
+    "[#{blue(progname)}][#{datetime}], #{severity}: #{msg}\n"
+  end
+)
+
+# log file.
+log_to_logfile = Logger.new("logfile.log")
+
+# logger = STDOUT
+logger.info("Program started...")
+# }}}
+# {{{1 methods
 #------------------------------------------------------------------------------
 # methods
 #------------------------------------------------------------------------------
@@ -62,14 +95,6 @@ def read_file(arg)
   aa.reject { |item| item.nil? || item == '  ' || item == ' ' || item == '\n' || item == ' \n' }
 end
 
-def div
-  puts "-"*50
-end
-
-def blue(color)
-  "\e[34m#{color}\e[0m"
-end
-
 # Uses youtube-dl's auto sub generate downloader. downloads to ~/Downloads/Youtube
 def youtube_subtitles(address)
     system("youtube-dl --write-auto-sub --sub-format best --sub-lang en --skip-download --write-info-json \'#{address}\'")
@@ -80,26 +105,28 @@ def sub_dir(directory_location)
     Dir.glob(directory_location + "/**/*").select{ |f| File.file? f }
 end
 
-#------------------------------------------------------------------------------
-# logger
-#------------------------------------------------------------------------------
-
-# log app status's
-logger = Logger.new(STDOUT,
-  level: Logger::INFO,
-  progname: 'youtube',
-  datetime_format: '%Y-%m-%d %H:%M:%S',
-  formatter: proc do |severity, datetime, progname, msg|
-    "[#{blue(progname)}][#{datetime}], #{severity}: #{msg}\n"
+# test whether then db returns true or false on the user or kicks an error.
+def has_db_been_populated
+  begin
+    User.all.present?
+  rescue ActiveRecord::StatementInvalid => e
+    puts "#{e}"
+    puts "Check the datbase has been created by running. Rake subtitle:full_build"
+    log_to_logfile.error("Program Closed: Database does not exist.")
+    exit
   end
-)
+end
 
-# log file.
-log_to_logfile = Logger.new("logfile.log")
+def load_models
+  # eager load the models keep it outside the loop so its only called once.
+  Rails.application.eager_load!
 
-# logger = STDOUT
-logger.info("Program started...")
+  # For Rails5 models are now subclasses of ApplicationRecord so to get the list
+  # of all models in your app you do:
+  return ApplicationRecord.descendants.collect { |type| type.name }
+end
 
+# }}}
 #------------------------------------------------------------------------------
 # Test connection to datbase is possible
 #------------------------------------------------------------------------------
@@ -107,14 +134,8 @@ log_to_logfile.error("Program Close: Database does not exist.") unless database_
 exit unless database_exists?
 
 # test whether then db returns true or false on the user or kicks an error.
-begin
-  User.all.present?
-rescue ActiveRecord::StatementInvalid => e
-  puts "#{e}"
-  puts "check the datbase has been created by running. rake subtitle:full_build"
-  log_to_logfile.error("Program Closed: Database does not exist.")
-  exit
-end
+# if not this will exit the program.
+has_db_been_populated
 #------------------------------------------------------------------------------
 # remove and remake old directory
 #------------------------------------------------------------------------------
@@ -180,10 +201,6 @@ sub_path.each do |file|
     (downloaded_subs['sentence']||[])<< read_file(file)
     logger.info("created #{downloaded_subs['sentence'].flatten.count} sentences.") if downloaded_subs['sentence'].length > 0
 
-    # push the array words returned from the method to the hash array value.
-    (downloaded_subs['words']||[])<< read_file(file).join.split(" ")
-    logger.info("created #{downloaded_subs['words'].flatten.count} words.") if downloaded_subs['words'].length > 0
-
   end
 
 end
@@ -194,7 +211,7 @@ end
 result = Hash.new {|h,k| h[k] = [] }
 
 # flatten out the array of arrays
-sublist = downloaded_subs['words'].flatten
+sublist = downloaded_subs['sentence'].join.split(" ")
 
 # remove blacklist words from the array if they are found in the database.
 subs = sublist.reject { |w| w if Blacklist.find_by(word: w) }
@@ -235,20 +252,15 @@ ignore_files = ["Blacklist", "User", "YoutubeResult"]
 #------------------------------------------------------------------------------
 # Load datasets
 #------------------------------------------------------------------------------
-# eager load the models keep it outside the loop so its only called once.
-Rails.application.eager_load!
-
-# For Rails5 models are now subclasses of ApplicationRecord so to get the list
-# of all models in your app you do:
-rails_models = ApplicationRecord.descendants.collect { |type| type.name }
-
-# if datasets are not present exit and log otherwise print the count to screen.
-if rails_models.present?
-  logger.info("found #{rails_models.count} datasets")
+# Eager loads the rails models. If datasets are not present exit and log
+# otherwise print the count to screen.
+if load_models.present?
+  logger.info("found #{load_models.count} datasets")
 else
-  log_to_logfile.error("#{rails_models.count} datasets were found.")
+  log_to_logfile.error("#{load_models.count} datasets were found.")
   exit
 end
+
 #------------------------------------------------------------------------------
 # Dataset words
 #------------------------------------------------------------------------------
@@ -262,11 +274,13 @@ result.each do |k, paragraph_array|
     # create the hash each iteration.
     rhash = Hash.new { |h,k| h[k] = Hash.new(0) }
 
+    # NOTE: subs needs to be blacklist words removed.
+
     # hash the para array and count.
     subs = para.split(" ").group_by(&:itself).transform_values(&:count).to_h
 
     # rails_models are each dataset the words will be ran against.
-    rails_models.each do |dataset|
+    load_models.each do |dataset|
       unless ignore_files.include?(dataset)
 
         #----------------------------------------------------------------------
