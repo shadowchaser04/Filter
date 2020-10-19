@@ -3,15 +3,6 @@ require File.expand_path('../../config/environment', __FILE__)
 require 'pry'
 require 'json'
 require 'logger'
-
-# TODO: make an array of subscribed. automate as a cron task the reqular down
-# load and updating of video subtitles.
-# 1. get playlist of each subscribed video.
-# 2. download the subtitles based of a date range.
-# 3. loop through each sub.
-# 4. update the total.
-# 5. schedule via a cron task.
-
 # {{{1 format
 #------------------------------------------------------------------------------
 # format
@@ -87,6 +78,8 @@ def read_file(arg)
   sanatised = []
   File.open(arg).each do |line|
       line.gsub!(/<[^>]*>/, "")
+      # NOTE: new addition
+      line.gsub!(/(__)/, '')
       sanatised << line.gsub(/([^\w\s]|([0-9]|\:|\.))/, "").downcase
   end
   # remove dup lines with uniq then clean up formatting.
@@ -127,6 +120,7 @@ def load_models
 end
 
 # }}}
+# {{{1 test connection
 #------------------------------------------------------------------------------
 # Test connection to datbase is possible
 #------------------------------------------------------------------------------
@@ -136,6 +130,8 @@ exit unless database_exists?
 # test whether then db returns true or false on the user or kicks an error.
 # if not this will exit the program.
 has_db_been_populated
+# }}}
+# {{{1 remove old directories
 #------------------------------------------------------------------------------
 # remove and remake old directory
 #------------------------------------------------------------------------------
@@ -150,10 +146,11 @@ logger.info("removed #{root_dir}") if !Dir.exist?(root_dir)
 FileUtils.mkdir(root_dir) if !Dir.exist?(root_dir)
 logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 
+# }}}
+# {{{1 user input
 #------------------------------------------------------------------------------
 # take user input
 #------------------------------------------------------------------------------
-
 # loop infinitely until the youtube address passes validation the exit
 while 0
 
@@ -174,7 +171,8 @@ while 0
   end
 
 end
-
+# }}}
+# {{{1 build sentence array
 #------------------------------------------------------------------------------
 # build datasets word and sentence and json information
 #------------------------------------------------------------------------------
@@ -204,7 +202,8 @@ sub_path.each do |file|
   end
 
 end
-
+# }}}
+# {{{1 remove blacklist
 #------------------------------------------------------------------------------
 # remove blasklist
 #------------------------------------------------------------------------------
@@ -218,7 +217,8 @@ subs = sublist.reject { |w| w if Blacklist.find_by(word: w) }
 
 # group the words by themselves then count the words, sort and turn into a hash
 top_count_hash = subs.count_and_hash(10)
-
+# }}}
+# {{{1 create paragraphs
 #------------------------------------------------------------------------------
 # create paragraph
 #------------------------------------------------------------------------------
@@ -239,14 +239,15 @@ top_count_hash.keys.each do |k|
   subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; sublist[pre..pro].join(" ") }
   subs_ints.each {|paragraph| (result[:"#{k}"]||[]) << paragraph }
 end
-
+# }}}
+# {{{1 load datasets
 #------------------------------------------------------------------------------
 # data sets and hashes for paragraphs
 #------------------------------------------------------------------------------
-# result paragraphs
+# Result paragraphs
 paragraph = Hash.new { |h,k| h[k] = [] }
 
-# remove from iterating over datasets
+# Remove from iterating over datasets
 ignore_files = ["Blacklist", "User", "YoutubeResult"]
 
 #------------------------------------------------------------------------------
@@ -260,46 +261,44 @@ else
   log_to_logfile.error("#{load_models.count} datasets were found.")
   exit
 end
-
+# }}}
 #------------------------------------------------------------------------------
 # Dataset words
 #------------------------------------------------------------------------------
-# loop over each dataset
+# Loop over each dataset
 result.each do |k, paragraph_array|
   logger.info("paragraph count is #{paragraph_array.count} for #{k}")
 
-  # loop each individual paragraph belonging to a key.
+  # Loop each individual paragraph belonging to a key.
   paragraph_array.flatten.each do |para|
 
-    # create the hash each iteration.
+    # Create the hash each iteration.
     rhash = Hash.new { |h,k| h[k] = Hash.new(0) }
 
-    # NOTE: subs needs to be blacklist words removed.
-
-    # hash the para array and count.
+    # Hash the para array and count.
     subs = para.split(" ").group_by(&:itself).transform_values(&:count).to_h
 
-    # rails_models are each dataset the words will be ran against.
+    # Rails_models are each dataset the words will be ran against.
     load_models.each do |dataset|
       unless ignore_files.include?(dataset)
 
         #----------------------------------------------------------------------
         # words and sentence
         #----------------------------------------------------------------------
-        # pluck all the words form the dataset. Filter out any words leaving
+        # Pluck all the words form the dataset. Filter out any words leaving
         # only sentences. Loop over each sentence, scanning the paragraph of
         # text (which is a string) for all occurrences of the sentence.
         ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
         ds.each {|x| rhash["#{dataset.underscore}"]["#{x}"] = para.scan(/#{x}/).count if para.scan(/#{x}/).count > 1 }
 
-          # create a array of words from the database.
+          # Create a array of words from the database.
         if dataset.constantize.where(word: subs.keys).present?
 
-          # where takes an array. In this case each key from the subs.keys
+          # Where takes an array. In this case each key from the subs.keys
           # hash. And returns an array in one call of each found word.
           found_words = dataset.constantize.where(word: subs.keys)
 
-          # loop over the found words. Creating the hash per paragraph.
+          # Loop over the found words. Creating the hash per paragraph.
           found_words.each { |word| rhash["#{dataset.underscore}"][word[:word]] = subs[word[:word]] }
         end
       end
@@ -307,12 +306,12 @@ result.each do |k, paragraph_array|
     #--------------------------------------------------------------------------
     # top words
     #--------------------------------------------------------------------------
-    # hash count the words of the paragraphs
-    top_ten_paragraph_words = para.split(" ").count_and_hash(10)
+    # Hash count the words of the paragraphs
+    top_ten_paragraph_words = subs.reject {|k,v| k if Blacklist.find_by(word: k) }.sort_by{|k, v| v}.reverse.first(10).to_h.symbolize_keys
     #--------------------------------------------------------------------------
     # count all values
     #--------------------------------------------------------------------------
-    # count the topics so as to rank the result based on the count.
+    # Count the topics so as to rank the result based on the count.
     counted = Hash.new(0)
     count_result = Hash.new(0)
 
@@ -321,7 +320,7 @@ result.each do |k, paragraph_array|
     #--------------------------------------------------------------------------
     # build paragraph
     #--------------------------------------------------------------------------
-    # add the paragraph and dataset hash back into the array under its key
+    # Add the paragraph and dataset hash back into the array under its key
     (paragraph[k]||[]) << [para, top_ten_paragraph_words, rhash, count_result]
   end
 end
@@ -360,7 +359,7 @@ end
 # symbolz are quicker, have a uniq id.
 paragraph_symbolz = new_par.deep_symbolize_keys
 paragraph_symbolz.each do |k,v|
-  puts "#{k})\n"
+  puts "#{blue(k)})\n"
   v.each_with_index do |par,i|
     puts "#{i}) #{par}"
     puts "\n"

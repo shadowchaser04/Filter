@@ -4,14 +4,13 @@ require 'pry'
 require 'json'
 require 'logger'
 
-# TODO: add top_ten count of words.
-
+# Create a hash with a defualt value of 0
 result_hash = Hash.new {|h,k| h[k] = Hash.new(0) }
 
 # iterate over each User tallying the results of all the youtube_results.
 User.all.each do |item|
 
-  # reset the accumulated_duration so it can be rebuilt dedendent on any
+  # reset the accumulated_duration so it can be rebuilt dependent on any
   # changes to its size.
   item[:accumulated_duration] = 0
 
