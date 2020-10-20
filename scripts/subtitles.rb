@@ -209,13 +209,14 @@ end
 #------------------------------------------------------------------------------
 result = Hash.new {|h,k| h[k] = [] }
 
-# flatten out the array of arrays
+# Flatten out the array of arrays
 sublist = downloaded_subs['sentence'].join.split(" ")
 
-# remove blacklist words from the array if they are found in the database.
-subs = sublist.reject { |w| w if Blacklist.find_by(word: w) }
+# Pass in the sublist array to the Where returning an array of badwords
+# subtracted from the sublist.
+subs = (sublist - Blacklist.where(word: sublist).pluck(:word))
 
-# group the words by themselves then count the words, sort and turn into a hash
+# Group the words by themselves then count the words, sort and turn into a hash
 top_count_hash = subs.count_and_hash(10)
 # }}}
 # {{{1 create paragraphs
@@ -281,7 +282,6 @@ result.each do |k, paragraph_array|
     # Rails_models are each dataset the words will be ran against.
     load_models.each do |dataset|
       unless ignore_files.include?(dataset)
-
         #----------------------------------------------------------------------
         # words and sentence
         #----------------------------------------------------------------------
@@ -289,7 +289,7 @@ result.each do |k, paragraph_array|
         # only sentences. Loop over each sentence, scanning the paragraph of
         # text (which is a string) for all occurrences of the sentence.
         ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
-        ds.each {|x| rhash["#{dataset.underscore}"]["#{x}"] = para.scan(/#{x}/).count if para.scan(/#{x}/).count > 1 }
+        ds.each {|x| rhash["#{dataset.underscore}"][x] = para.scan(/#{x}/).count if para.scan(/#{x}/).count > 1 }
 
           # Create a array of words from the database.
         if dataset.constantize.where(word: subs.keys).present?
@@ -312,11 +312,8 @@ result.each do |k, paragraph_array|
     # count all values
     #--------------------------------------------------------------------------
     # Count the topics so as to rank the result based on the count.
-    counted = Hash.new(0)
     count_result = Hash.new(0)
-
-    rhash.keys.each {|k| rhash.dup[k].each {|key,val| counted[k] += val } }
-    counted.each {|k,v| count_result[:rank] += v }
+    rhash.each { |k,nested_hash| count_result[:rank] += nested_hash.values.sum }
     #--------------------------------------------------------------------------
     # build paragraph
     #--------------------------------------------------------------------------
@@ -328,26 +325,17 @@ end
 #------------------------------------------------------------------------------
 # rank the paragraphs - highest total
 #------------------------------------------------------------------------------
-new_par = Hash.new {|h,k| h[k] = [] }
-
+# sort the paragraphs by there rank number. transform_values! changes the hash.
+paragraph.transform_values! { |value_array| value_array.sort_by {|paragraph_array| paragraph_array[3][:rank] } }
+#------------------------------------------------------------------------------
+# sum all rank the topics
+#------------------------------------------------------------------------------
+all_topics = Hash.new(0)
 # paragraphs_array
 # 1) paragraph
 # 2) top ten words count
 # 3) hash of database words counted
-paragraph.each do |k,arr|
-  new_par[k] = arr.sort_by {|paragraph_array| paragraph_array[3][:rank] }
-end
-
-#------------------------------------------------------------------------------
-# total the topics
-#------------------------------------------------------------------------------
-all_topics = Hash.new(0)
-
-# paragraphs_array
-    # 0) paragraph
-    # 1) topten
-    # 2) hash
-paragraph.each do |top_key, arr|
+paragraph.each do |key,arr|
   arr.each do |topic_array|
     topic_array[2].each { |k,v| all_topics[k] += v.values.sum }
   end
@@ -357,7 +345,7 @@ end
 # symbolize
 #------------------------------------------------------------------------------
 # symbolz are quicker, have a uniq id.
-paragraph_symbolz = new_par.deep_symbolize_keys
+paragraph_symbolz = paragraph.deep_symbolize_keys
 paragraph_symbolz.each do |k,v|
   puts "#{blue(k)})\n"
   v.each_with_index do |par,i|
