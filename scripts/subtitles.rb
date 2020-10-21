@@ -5,8 +5,6 @@ require 'json'
 require 'logger'
 # {{{1 format
 #------------------------------------------------------------------------------
-# format
-#------------------------------------------------------------------------------
 def div
   puts "-"*50
 end
@@ -16,8 +14,6 @@ def blue(color)
 end
 # }}}
 # {{{1 logger
-#------------------------------------------------------------------------------
-# logger
 #------------------------------------------------------------------------------
 # log app status's
 logger = Logger.new(STDOUT,
@@ -36,8 +32,6 @@ log_to_logfile = Logger.new("logfile.log")
 logger.info("Program started...")
 # }}}
 # {{{1 methods
-#------------------------------------------------------------------------------
-# methods
 #------------------------------------------------------------------------------
 def database_exists?
   ActiveRecord::Base.connection
@@ -122,8 +116,6 @@ end
 # }}}
 # {{{1 test connection
 #------------------------------------------------------------------------------
-# Test connection to datbase is possible
-#------------------------------------------------------------------------------
 log_to_logfile.error("Program Close: Database does not exist.") unless database_exists?
 exit unless database_exists?
 
@@ -132,8 +124,6 @@ exit unless database_exists?
 has_db_been_populated
 # }}}
 # {{{1 remove old directories
-#------------------------------------------------------------------------------
-# remove and remake old directory
 #------------------------------------------------------------------------------
 # root directory
 root_dir = "/Users/shadowchaser/Downloads/Youtube_Subtitles/Subs"
@@ -148,8 +138,6 @@ logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 
 # }}}
 # {{{1 user input
-#------------------------------------------------------------------------------
-# take user input
 #------------------------------------------------------------------------------
 # loop infinitely until the youtube address passes validation the exit
 while 0
@@ -173,8 +161,6 @@ while 0
 end
 # }}}
 # {{{1 build sentence array
-#------------------------------------------------------------------------------
-# build datasets word and sentence and json information
 #------------------------------------------------------------------------------
 # create the hash for the subtitles
 downloaded_subs = Hash.new { |h,k| h[k] = [] }
@@ -205,8 +191,6 @@ end
 # }}}
 # {{{1 remove blacklist
 #------------------------------------------------------------------------------
-# remove blasklist
-#------------------------------------------------------------------------------
 result = Hash.new {|h,k| h[k] = [] }
 
 # Flatten out the array of arrays
@@ -220,8 +204,6 @@ subs = (sublist - Blacklist.where(word: sublist).pluck(:word))
 top_count_hash = subs.count_and_hash(10)
 # }}}
 # {{{1 create paragraphs
-#------------------------------------------------------------------------------
-# create paragraph
 #------------------------------------------------------------------------------
 top_count_hash.keys.each do |k|
   # loops over the top ten found words, group_by groups all the nested array words
@@ -238,12 +220,10 @@ top_count_hash.keys.each do |k|
   # range of 50 words before and after i. Which is its index position. These
   # are then joined into the paragraph.
   subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; sublist[pre..pro].join(" ") }
-  subs_ints.each {|paragraph| (result[:"#{k}"]||[]) << paragraph }
+  subs_ints.each {|paragraph| (result[k]||[]) << paragraph }
 end
 # }}}
 # {{{1 load datasets
-#------------------------------------------------------------------------------
-# data sets and hashes for paragraphs
 #------------------------------------------------------------------------------
 # Result paragraphs
 paragraph = Hash.new { |h,k| h[k] = [] }
@@ -263,12 +243,13 @@ else
   exit
 end
 # }}}
-#------------------------------------------------------------------------------
-# Dataset words
+# {{{1 main
 #------------------------------------------------------------------------------
 # Loop over each dataset
 result.each do |k, paragraph_array|
   logger.info("paragraph count is #{paragraph_array.count} for #{k}")
+  # create a marker for time to log each loops rate of build.
+  t=Time.now
 
   # Loop each individual paragraph belonging to a key.
   paragraph_array.flatten.each do |para|
@@ -291,7 +272,7 @@ result.each do |k, paragraph_array|
         ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
         ds.each {|x| rhash["#{dataset.underscore}"][x] = para.scan(/#{x}/).count if para.scan(/#{x}/).count > 1 }
 
-          # Create a array of words from the database.
+        # Create a array of words from the database.
         if dataset.constantize.where(word: subs.keys).present?
 
           # Where takes an array. In this case each key from the subs.keys
@@ -320,10 +301,10 @@ result.each do |k, paragraph_array|
     # Add the paragraph and dataset hash back into the array under its key
     (paragraph[k]||[]) << [para, top_ten_paragraph_words, rhash, count_result]
   end
+  logger.info("Built #{k} in: #{Time.now - t}")
 end
-
-#------------------------------------------------------------------------------
-# rank the paragraphs - highest total
+#}}}
+#{{{1 sum and rank
 #------------------------------------------------------------------------------
 # sort the paragraphs by there rank number. transform_values! changes the hash.
 paragraph.transform_values! { |value_array| value_array.sort_by {|paragraph_array| paragraph_array[3][:rank] } }
@@ -340,22 +321,21 @@ paragraph.each do |key,arr|
     topic_array[2].each { |k,v| all_topics[k] += v.values.sum }
   end
 end
-
-#------------------------------------------------------------------------------
-# symbolize
+#}}}
+#{{{1 display output
 #------------------------------------------------------------------------------
 # symbolz are quicker, have a uniq id.
 paragraph_symbolz = paragraph.deep_symbolize_keys
 paragraph_symbolz.each do |k,v|
   puts "#{blue(k)})\n"
   v.each_with_index do |par,i|
-    puts "#{i}) #{par}"
+    puts "#{i})"
+    par.each {|item| puts item }
     puts "\n"
   end
 end
 
-#------------------------------------------------------------------------------
-# retrive json data
+#{{{1 json
 #------------------------------------------------------------------------------
 # there are two files in the sub_path. *.json, *.vtt
 # select the json returning an array.
@@ -369,11 +349,11 @@ else
   logger.error("Error: no j.son data - check log for more thorough explanation")
   exit
 end
-
-#------------------------------------------------------------------------------
-# format
+#}}}
+#{{{1 build db
 #------------------------------------------------------------------------------
 yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
 re = yt_user.youtube_results.find_or_create_by(title: data['title'])
 re.update(duration: data['duration'], meta_data: {total: all_topics, top_count: top_count_hash})
+#}}}
 
