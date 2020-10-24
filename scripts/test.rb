@@ -4,42 +4,38 @@ require 'pry'
 require 'json'
 require 'logger'
 
-class Hash
-  def fetch_in(*keys, **kwargs, &block)
-    keys = keys.dup
-    ckey = keys.shift
 
-    unless self.key?(ckey)
-      return kwargs[:default] if kwargs.key?(:default)
-      return block.call(ckey) if block
-      fail KeyError, "key not found #{ckey.inspect}"
-    end
+arr = ["one", "two", "three", "four", "five", "one", "two"]
 
-    child = self[ckey]
-
-    if keys.empty?
-      child
-    elsif child.respond_to?(:fetch_in)
-      child.fetch_in(*keys, **kwargs, &block)
-    else
-      fail ArgumentError, 'more keys than Hashes'
-    end
+arr.each_with_object(Hash.new(0)) do |item, count_hash|
+  if count_hash[item]
+    count_hash[item] += 1
+  else
+    count_hash[item] = 1
   end
-end
-
-a = {
-  a: {
-    b: {
-      c: :d
-    }
-  }
-}
-
-def y
-  yield
-rescue => e
-  e
+  binding.pry
 end
 
 binding.pry
-puts ""
+puts arr
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

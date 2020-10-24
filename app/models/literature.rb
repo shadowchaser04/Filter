@@ -1,0 +1,2 @@
+class Literature < ApplicationRecord
+end

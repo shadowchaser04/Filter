@@ -3,3 +3,8 @@ I, [2020-10-11T21:11:15.977080 #98080]  INFO -- : SubPathError: Expected 2 files
 I, [2020-10-12T10:07:15.670678 #5615]  INFO -- : SubPathError: Expected 2 files *.json and *.vtt. Found 1.
 E, [2020-10-17T06:03:28.443118 #54210] ERROR -- : 0 datasets were found.
 E, [2020-10-17T09:17:53.329446 #57093] ERROR -- : RetriveJsonDataError: program closed due to ["The Fundamental Flaw.info.jon"] error. no .json file.
+I, [2020-10-24T08:37:50.306170 #86585]  INFO -- : SubPathError: Expected 2 files *.json and *.vtt. Found 1.
+I, [2020-10-24T10:49:27.826423 #88145]  INFO -- : SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+I, [2020-10-24T11:01:30.451084 #88355]  INFO -- : SubPathError: Expected 2 files *.json and *.vtt. Found 1.
+I, [2020-10-24T11:05:03.769277 #88485]  INFO -- : SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+I, [2020-10-24T11:27:17.115180 #88913]  INFO -- : SubPathError: Expected 2 files *.json and *.vtt. Found 1.

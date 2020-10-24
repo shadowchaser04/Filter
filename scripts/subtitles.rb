@@ -3,6 +3,9 @@ require File.expand_path('../../config/environment', __FILE__)
 require 'pry'
 require 'json'
 require 'logger'
+
+# TODO: down database and models.
+
 # {{{1 format
 #------------------------------------------------------------------------------
 def div
@@ -111,6 +114,10 @@ def load_models
   # For Rails5 models are now subclasses of ApplicationRecord so to get the list
   # of all models in your app you do:
   return ApplicationRecord.descendants.collect { |type| type.name }
+end
+
+private def nested_hash
+  Hash.new { |h,k| h[k] = Hash.new(0) }
 end
 
 # }}}
@@ -252,10 +259,14 @@ result.each do |k, paragraph_array|
   t=Time.now
 
   # Loop each individual paragraph belonging to a key.
+  # The each with object takes a hash with nested hashes set to 0.
+  # Iterates over a collection, passing the current element and the memo to the
+  # block
+  # nested_hash is a private method
   paragraph_array.flatten.each do |para|
 
-    # Create the hash each iteration.
-    rhash = Hash.new { |h,k| h[k] = Hash.new(0) }
+    # create a nested hash with default value as 0
+    rhash = nested_hash
 
     # Hash the para array and count.
     subs = para.split(" ").group_by(&:itself).transform_values(&:count).to_h
@@ -270,7 +281,7 @@ result.each do |k, paragraph_array|
         # only sentences. Loop over each sentence, scanning the paragraph of
         # text (which is a string) for all occurrences of the sentence.
         ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
-        ds.each {|x| rhash["#{dataset.underscore}"][x] = para.scan(/#{x}/).count if para.scan(/#{x}/).count > 1 }
+        ds.each {|x| rhash["#{dataset.underscore}"][x] = para.scan(/#{x}/).count if para.scan(/#{x}/).count >= 1 }
 
         # Create a array of words from the database.
         if dataset.constantize.where(word: subs.keys).present?
