@@ -1,0 +1,2 @@
+class Psychology < ApplicationRecord
+end

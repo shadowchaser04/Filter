@@ -5,6 +5,15 @@ require 'json'
 require 'logger'
 
 # TODO: down database and models.
+# TODO: boolean values for each outside of the topics
+# modality
+# sentiment
+# color
+# contry
+# family
+# profanity
+#
+# topic - boolean
 
 # {{{1 format
 #------------------------------------------------------------------------------
@@ -19,17 +28,20 @@ end
 # {{{1 logger
 #------------------------------------------------------------------------------
 # log app status's
-logger = Logger.new(STDOUT,
-  level: Logger::INFO,
-  progname: 'youtube',
-  datetime_format: '%Y-%m-%d %H:%M:%S',
-  formatter: proc do |severity, datetime, progname, msg|
-    "[#{blue(progname)}][#{datetime}], #{severity}: #{msg}\n"
-  end
-)
+def logger_output(choice_of_output)
+    Logger.new(choice_of_output,
+    level: Logger::INFO,
+    progname: 'youtube',
+    datetime_format: '%Y-%m-%d %H:%M:%S',
+    formatter: proc do |severity, datetime, progname, msg|
+      "[#{blue(progname)}][#{datetime}], #{severity}: #{msg}\n"
+    end
+  )
+end
 
+logger = logger_output(STDOUT)
 # log file.
-log_to_logfile = Logger.new("logfile.log")
+log_to_logfile = logger_output("logfile.log")
 
 # logger = STDOUT
 logger.info("Program started...")
@@ -166,6 +178,7 @@ while 0
   end
 
 end
+binding.pry
 # }}}
 # {{{1 build sentence array
 #------------------------------------------------------------------------------
@@ -179,7 +192,7 @@ json_hash = {}
 sub_path = sub_dir(root_dir)
 
 # instead of the usual log to STDOUT log to *.log file.
-log_to_logfile.info("SubPathError: Expected 2 files *.json and *.vtt. Found #{sub_path.count}.") unless sub_path.count == 2
+log_to_logfile.error("SubPathError: Expected 2 files *.json and *.vtt. Found #{sub_path.count}.") unless sub_path.count == 2
 
 # there should always be two
 exit unless sub_path.count == 2
@@ -361,6 +374,7 @@ else
   exit
 end
 #}}}
+binding.pry
 #{{{1 build db
 #------------------------------------------------------------------------------
 yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])

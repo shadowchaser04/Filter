@@ -1,0 +1,2 @@
+class MovieIndustry < ApplicationRecord
+end
