@@ -178,7 +178,6 @@ while 0
   end
 
 end
-binding.pry
 # }}}
 # {{{1 build sentence array
 #------------------------------------------------------------------------------
@@ -318,12 +317,29 @@ result.each do |k, paragraph_array|
     #--------------------------------------------------------------------------
     # Count the topics so as to rank the result based on the count.
     count_result = Hash.new(0)
+    percent = Hash.new(0)
     rhash.each { |k,nested_hash| count_result[:rank] += nested_hash.values.sum }
+
+    rhash.each { |k,v| percent[k] += v.values.sum }
+
+    # sum all the values to get the percentage.
+    denominator = percent.values.sum
+
+    # order the hash
+    order_topics = percent.sort_by(&:last).reverse.to_h
+
+    # devide v by the denominator which is the sum of all values and * 100 to
+    # get the percentage.
+    order_topics.transform_values! do |v|
+      n = (v / denominator.to_f*100).round(2)
+      total = n.to_s + "%"
+      total
+    end
     #--------------------------------------------------------------------------
     # build paragraph
     #--------------------------------------------------------------------------
     # Add the paragraph and dataset hash back into the array under its key
-    (paragraph[k]||[]) << [para, top_ten_paragraph_words, rhash, count_result]
+    (paragraph[k]||[]) << [para, top_ten_paragraph_words, rhash, count_result, order_topics]
   end
   logger.info("Built #{k} in: #{Time.now - t}")
 end
@@ -374,7 +390,18 @@ else
   exit
 end
 #}}}
-binding.pry
+#{{{1 percentage of all words
+# sum all the values to get the percentage.
+denominator = all_topics.values.sum
+
+order_topics = all_topics.sort_by(&:last).reverse.to_h
+
+order_topics.each do |k,v|
+  n = (v / denominator.to_f*100).round(2)
+  total = n.to_s + "%"
+  puts "#{k} ->  #{total}"
+end
+#}}}
 #{{{1 build db
 #------------------------------------------------------------------------------
 yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
