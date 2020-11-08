@@ -15,6 +15,9 @@ require 'logger'
 #
 # topic - boolean
 
+#file = "datasets.json"
+#dataset = JSON.parse(File.read(file))
+
 # {{{1 format
 #------------------------------------------------------------------------------
 def div

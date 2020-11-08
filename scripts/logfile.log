@@ -7,3 +7,14 @@ E, [2020-10-17T09:17:53.329446 #57093] ERROR -- : RetriveJsonDataError: program 
 [[34myoutube[0m][2020-10-24 14:31:02 +0100], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 1.
 [[34myoutube[0m][2020-10-25 13:23:55 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 1.
 [[34myoutube[0m][2020-10-25 16:52:10 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+[[34myoutube[0m][2020-10-30 18:29:48 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+[[34myoutube[0m][2020-10-30 18:30:02 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+[[34myoutube[0m][2020-10-30 18:30:31 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+[[34myoutube[0m][2020-11-02 15:13:08 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+[[34myoutube[0m][2020-11-02 15:13:28 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+[[34myoutube[0m][2020-11-02 15:13:58 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+[[34myoutube[0m][2020-11-02 15:14:43 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+[[34myoutube[0m][2020-11-02 15:15:15 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+[[34myoutube[0m][2020-11-02 15:15:47 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+[[34myoutube[0m][2020-11-06 12:52:23 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 1.
+[[34myoutube[0m][2020-11-06 12:52:48 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.

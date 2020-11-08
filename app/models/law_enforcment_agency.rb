@@ -1,0 +1,2 @@
+class LawEnforcmentAgency < ApplicationRecord
+end

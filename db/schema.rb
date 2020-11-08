@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2020_10_24_174149) do
+ActiveRecord::Schema.define(version: 2020_11_08_160505) do
 
   create_table "actors", force: :cascade do |t|
     t.string "word"
@@ -36,6 +36,10 @@ ActiveRecord::Schema.define(version: 2020_10_24_174149) do
     t.string "word"
   end
 
+  create_table "bummings", force: :cascade do |t|
+    t.string "word"
+  end
+
   create_table "cars", force: :cascade do |t|
     t.string "word"
   end
@@ -57,6 +61,10 @@ ActiveRecord::Schema.define(version: 2020_10_24_174149) do
   end
 
   create_table "directors", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "drugs", force: :cascade do |t|
     t.string "word"
   end
 
@@ -88,7 +96,15 @@ ActiveRecord::Schema.define(version: 2020_10_24_174149) do
     t.string "word"
   end
 
+  create_table "law_enforcment_agencies", force: :cascade do |t|
+    t.string "word"
+  end
+
   create_table "literatures", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "mmas", force: :cascade do |t|
     t.string "word"
   end
 

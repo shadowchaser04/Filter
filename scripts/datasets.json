@@ -1,0 +1,9 @@
+{ 
+    "color":["analogous_color", "color", "complimentary_color", "split_complimentary_color", "tertiary_color", "triadic_color"],
+    "blacklist":["blacklist"], 
+    "family":["family"], 
+    "countries":["countries"],
+    "modality":["auitory", "visual", "kinesthetic", "olfactory", "gustatory"], 
+    "profanity":["profanity_obscene", "profanity_profane", "profanity_vulgar"], 
+    "sentiment":["negative_sentiment", "posative_sentiment"] 
+}
