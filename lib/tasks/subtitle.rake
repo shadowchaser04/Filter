@@ -7,7 +7,7 @@ def sub_dir(directory_location)
 end
 
 # root data directory.
-root = "/Users/shadowchaser/Code/Ruby/Projects/filter/lib/data"
+root = Rails.root.join('lib/data').to_s
 
 # filepaths to each file.
 namespace :subtitle do
@@ -30,7 +30,7 @@ namespace :subtitle do
       # For Rails5 models are now subclasses of ApplicationRecord so to get list of all models in your app you do:
       rails_models = ApplicationRecord.descendants.collect { |type| type.name }
 
-      unless rails_models.include?(name)
+      unless rails_models.include?(name.camelize)
         sh "rails g model #{name.camelize} word:string --no-timestamps"
       end
     end

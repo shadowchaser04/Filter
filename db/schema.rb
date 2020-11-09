@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2020_11_08_160505) do
+ActiveRecord::Schema.define(version: 2020_11_09_025047) do
 
   create_table "actors", force: :cascade do |t|
     t.string "word"
@@ -177,6 +177,10 @@ ActiveRecord::Schema.define(version: 2020_11_08_160505) do
   end
 
   create_table "split_complimentary_colors", force: :cascade do |t|
+    t.string "word"
+  end
+
+  create_table "tennis", force: :cascade do |t|
     t.string "word"
   end
 
