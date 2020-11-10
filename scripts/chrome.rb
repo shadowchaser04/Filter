@@ -17,11 +17,20 @@ puts ActiveRecord::SchemaDumper.dump
 # declared a new model
 class Url < ActiveRecord::Base
 
-    binding.pry
   def youtube_urls
-    binding.pry
-    Url.all.pluck(:url).map {|url| url if url =~ /[h][t][t][p][s]\:\/\/[w][w][w]\.[y][o][u][t][u][b][e]\.[c][o][m]\/[w][a][t][c][h]/ }.compact
+    result = {}
+    Url.all.map {|attr| result[attr.title] = {url: attr.url, visit_count: attr.visit_count, last: attr.last_visit_time} if attr.url =~ /[h][t][t][p][s]\:\/\/[w][w][w]\.[y][o][u][t][u][b][e]\.[c][o][m]\/[w][a][t][c][h]/ }.compact
+    return result
   end
+
+  # chrome history
+  # title
+  # date
+  # url
+  #
+  # the days youtube views
+  # does it need to be stored in the database?
+  # cron task every few mins or hour?
 
 end
 
@@ -29,7 +38,7 @@ end
 youtube = Url.new
 
 binding.pry
-# array of youutbe urls
+# hash of youtube urls
 youtube.youtube_urls
 
 
