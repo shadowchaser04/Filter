@@ -17,28 +17,33 @@ puts ActiveRecord::SchemaDumper.dump
 # declared a new model
 class Url < ActiveRecord::Base
 
-  def youtube_urls
+  # create a hash named after the title of the video for all matches to the
+  # youtube_address.
+  def youtube_urls_hash
     result = {}
-    Url.all.map {|attr| result[attr.title] = {url: attr.url, visit_count: attr.visit_count, last: attr.last_visit_time} if attr.url =~ /[h][t][t][p][s]\:\/\/[w][w][w]\.[y][o][u][t][u][b][e]\.[c][o][m]\/[w][a][t][c][h]/ }.compact
+    youtube_address = /[h][t][t][p][s]\:\/\/[w][w][w]\.[y][o][u][t][u][b][e]\.[c][o][m]\/[w][a][t][c][h]/
+
+    Url.all.each {|attr| result[attr.title] = {
+      url: attr.url,
+      visit_count: attr.visit_count,
+      last_visit: attr.last_visit_time} if attr.url =~ youtube_address
+    }.compact
     return result
   end
 
-  # chrome history
-  # title
-  # date
-  # url
-  #
   # the days youtube views
   # does it need to be stored in the database?
-  # cron task every few mins or hour?
+  # cron task every few mins or hour?
+  #
+  # create a model
+  # create a method that checks date, time and viewcount.
 
 end
 
 # create a instance of Url
 youtube = Url.new
 
-binding.pry
 # hash of youtube urls
-youtube.youtube_urls
+youtube.youtube_urls_hash
 
 
