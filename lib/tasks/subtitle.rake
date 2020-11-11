@@ -41,6 +41,11 @@ namespace :subtitle do
     sh "rails g model User uploader:string channel_id:string video_count:integer accumulated_duration:integer accumulator:json accumulator_last_update:datetime --no-timestamps"
   end
 
+  desc "create the chrome  model"
+  task chrome: :environment do
+    sh "rails g model Chrome title:string url:string visit_count:integer last_visit:datetime --no-timestamps"
+  end
+
   desc "create the result model"
   task result: :environment do
     sh "rails g model YoutubeResult title:string duration:integer meta_data:json user:references --no-timestamps"
@@ -51,6 +56,9 @@ namespace :subtitle do
 
     # build subtitles user model NOTE: this does not add the has_many assosh.
     sh "rake subtitle:user"
+
+    # build subtitles user model NOTE: this does not add the has_many assosh.
+    sh "rake subtitle:chrome"
 
     # build the belongs_to association between User and YoutubeResult.
     sh "rake subtitle:result"

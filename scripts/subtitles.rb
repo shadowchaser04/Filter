@@ -5,18 +5,10 @@ require 'json'
 require 'logger'
 
 # TODO: down database and models.
-# TODO: boolean values for each outside of the topics
-# modality
-# sentiment
-# color
-# contry
-# family
-# profanity
-#
-# topic - boolean
 
-#file = "datasets.json"
-#dataset = JSON.parse(File.read(file))
+# get todays date
+# do i write to file or db as an assosiated record to each video?
+#
 
 # {{{1 format
 #------------------------------------------------------------------------------
@@ -90,7 +82,6 @@ def read_file(arg)
   sanatised = []
   File.open(arg).each do |line|
       line.gsub!(/<[^>]*>/, "")
-      # NOTE: new addition
       line.gsub!(/(__)/, '')
       sanatised << line.gsub(/([^\w\s]|([0-9]|\:|\.))/, "").downcase
   end
@@ -161,7 +152,7 @@ logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 # }}}
 # {{{1 user input
 #------------------------------------------------------------------------------
-# loop infinitely until the youtube address passes validation the exit
+# loop infinitely until the youtube address passes validation then exit
 while 0
 
   # take youtube https
@@ -251,7 +242,7 @@ end
 paragraph = Hash.new { |h,k| h[k] = [] }
 
 # Remove from iterating over datasets
-ignore_files = ["Blacklist", "User", "YoutubeResult"]
+ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome"]
 
 #------------------------------------------------------------------------------
 # Load datasets

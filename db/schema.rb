@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2020_11_09_220240) do
+ActiveRecord::Schema.define(version: 2020_11_11_002042) do
 
   create_table "actors", force: :cascade do |t|
     t.string "word"
@@ -42,6 +42,13 @@ ActiveRecord::Schema.define(version: 2020_11_09_220240) do
 
   create_table "cars", force: :cascade do |t|
     t.string "word"
+  end
+
+  create_table "chromes", force: :cascade do |t|
+    t.string "url"
+    t.integer "visit_count"
+    t.datetime "last_visit"
+    t.string "title"
   end
 
   create_table "colors", force: :cascade do |t|
