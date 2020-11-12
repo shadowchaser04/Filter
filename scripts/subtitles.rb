@@ -182,35 +182,38 @@ sub_path.each do |file|
 
 end
 
+# remove any videos that have not downloaded both subtitles and json file.
+file_path_hash.reject! { |k,v| v.count != 2 }
+
 # }}}
 # {{{1 build sentence array
 #------------------------------------------------------------------------------
 # create the hash for the subtitles
 downloaded_subs = Hash.new { |h,k| h[k] = [] }
 
-# hash for the json file data.
-json_hash = {}
+# loop over the file path hash.
+file_path_hash.each do |key, files|
 
-# get the subtitles back from the downloads directory
-sub_path = sub_dir(root_dir)
+    files.each do |file|
 
-# instead of the usual log to STDOUT log to *.log file.
-log_to_logfile.error("SubPathError: Expected 2 files *.json and *.vtt. Found #{sub_path.count}.") unless sub_path.count == 2
+      # find the subtitles by there filetype.
+      if File.extname(file.split("/")[-1]) =~ /.vtt/
 
-# there should always be two
-exit unless sub_path.count == 2
-sub_path.each do |file|
+        # push the array sentences returned from the method to the hash array value.
+        subtitles = read_file(file)
 
-  # find the subtitles by there filetype.
-  if File.extname(file.split("/")[-1]) =~ /.vtt/
+        # add the subtitles to the hash.
+        (downloaded_subs[key]||[]) << subtitles
 
-    # push the array sentences returned from the method to the hash array value.
-    (downloaded_subs['sentence']||[])<< read_file(file)
-    logger.info("created #{downloaded_subs['sentence'].flatten.count} sentences.") if downloaded_subs['sentence'].length > 0
+        # flatten the value array.
+        downloaded_subs.transform_values! {|value_array| value_array.flatten }
+
+      end
 
   end
 
 end
+
 # }}}
 # {{{1 remove blacklist
 #------------------------------------------------------------------------------
