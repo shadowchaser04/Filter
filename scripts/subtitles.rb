@@ -8,7 +8,6 @@ require 'logger'
 
 # get todays date
 # do i write to file or db as an assosiated record to each video?
-#
 
 # {{{1 format
 #------------------------------------------------------------------------------
@@ -150,28 +149,39 @@ FileUtils.mkdir(root_dir) if !Dir.exist?(root_dir)
 logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 
 # }}}
-# {{{1 user input
-#------------------------------------------------------------------------------
-# loop infinitely until the youtube address passes validation then exit
-while 0
+# {{{1 download youtube subtitles
 
-  # take youtube https
-  puts "please enter address:>\n"
+# pass in a date range to the where method returning a collection of results
+# then pluck the urls returning an array.
+youtube_urls = Chrome.where(:last_visit => 1.days.ago..1.days.from_now).pluck(:url)
+logger.error("DownloadYoutubeSubtitlesError: no youtube videos for the period #{1.days.ago..1.days.from_now}") if youtube_urls.count == 0
+exit if youtube_urls.count == 0
 
-  # get user input
-  user_input = gets.chomp
-
-  if user_input =~ /^(https|http)\:(\/\/)[w]{3}\.(youtube)\.(com)/
-
-    # use the method youtube_playlist to download the subtitles.
-    youtube_subtitles(user_input)
-    break
-
-  else
-    puts "Invalid URL: please enter a valid URL"
+# loop over the youtube urls.
+youtube_urls.each do |url|
+  begin
+    youtube_subtitles(url)
+  rescue Exception => e
+    puts "#{e}"
   end
+end
+
+# create a hash with a array as values
+file_path_hash = Hash.new {|h,k| h[k] = [] }
+
+# create the filepaths.
+sub_path = sub_dir(root_dir)
+
+# loop over the file paths to organise them.
+sub_path.each do |file|
+
+  # create a key by getting the basename of the file and spliting of the file
+  # extentions and adding the file to the value array.
+  f = File.basename(file).split(/\./)[0]
+  (file_path_hash[f]||[]) << file if file_path_hash[f]
 
 end
+
 # }}}
 # {{{1 build sentence array
 #------------------------------------------------------------------------------

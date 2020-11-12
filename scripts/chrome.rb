@@ -3,10 +3,10 @@ require File.expand_path('../../config/environment', __FILE__)
 require 'pry'
 require 'json'
 require 'logger'
-
 require 'sqlite3'
 require 'active_record'
 
+#{{{1 methods
 # google chrome history
 def connect_to_chrome
   ActiveRecord::Base.establish_connection({
@@ -15,6 +15,14 @@ def connect_to_chrome
   })
 end
 
+def connect_to_safari
+  ActiveRecord::Base.establish_connection({
+    :adapter => "sqlite3",
+    :database => File.expand_path("~/Library/Safari/History.db")
+  })
+end
+binding.pry
+
 # re-establish_connection to rails db
 def connect_to_rails
   ActiveRecord::Base.establish_connection
@@ -22,7 +30,8 @@ end
 
 # make a connection to the chrome db
 connect_to_chrome
-
+#}}}
+#{{{1 chrome
 # declared a new model
 class Url < ActiveRecord::Base
 
@@ -71,7 +80,8 @@ class Url < ActiveRecord::Base
   end
 
 end
-
+#}}}
+#{{{1 main
 # create a instance of Url
 youtube = Url.new
 
@@ -96,4 +106,5 @@ unless youtube_urls_hash.empty?
 
   end
 end
+#}}}
 

@@ -19,3 +19,7 @@ E, [2020-10-17T09:17:53.329446 #57093] ERROR -- : RetriveJsonDataError: program 
 [[34myoutube[0m][2020-11-06 12:52:23 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 1.
 [[34myoutube[0m][2020-11-06 12:52:48 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
 [[34myoutube[0m][2020-11-11 06:24:38 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+[[34myoutube[0m][2020-11-12 00:04:59 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+[[34myoutube[0m][2020-11-12 00:06:03 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 0.
+[[34myoutube[0m][2020-11-12 00:07:02 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 3.
+[[34myoutube[0m][2020-11-12 00:28:44 +0000], ERROR: SubPathError: Expected 2 files *.json and *.vtt. Found 3.
