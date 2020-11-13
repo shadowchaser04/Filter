@@ -21,7 +21,6 @@ def connect_to_safari
     :database => File.expand_path("~/Library/Safari/History.db")
   })
 end
-binding.pry
 
 # re-establish_connection to rails db
 def connect_to_rails

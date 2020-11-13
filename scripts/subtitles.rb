@@ -63,8 +63,8 @@ end
 
 class Array
   # Counts each occurence of the word by the group_by method and hashes the result.
-  def count_and_hash(result=10)
-    self.group_by(&:itself).transform_values(&:count).sort_by{|k, v| v}.reverse.first(result).to_h.symbolize_keys
+  def count_and_hash
+    self.group_by(&:itself).transform_values(&:count).sort_by{|k, v| v}.reverse.to_h.symbolize_keys
   end
 end
 
@@ -160,13 +160,17 @@ logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 
 class SubtitleDownloader
 
+  attr_accessor :paragraph, :result
+
   include Logging
 
   def initialize
     @filepaths = hash_nested_array
     @subtitles = hash_nested_array
+    @paragraph = Hash.new {|h,k| h[k] = Hash.new {|hash, key| hash[key] = [] }}
     @result = Hash.new {|h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
     @logger = logger_output(STDOUT)
+    @ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome"]
   end
 
   # check the existence of the model in the db and that threr are any records.
@@ -224,7 +228,7 @@ class SubtitleDownloader
   # Group the words by themselves then count the words, sort and turn into a hash
   def create_paragraphs(downloaded_subs)
     downloaded_subs.each do |key, sublist|
-      top_count_hash = remove_blacklisted_words_from(sublist).count_and_hash(10)
+      top_count_hash = remove_blacklisted_words_from(sublist).count_and_hash.first(10).to_h
 
       top_count_hash.keys.each do |k|
         # loops over the top ten found words, group_by groups all the nested array words
@@ -241,7 +245,7 @@ class SubtitleDownloader
         # range of 50 words before and after i. Which is its index position. These
         # are then joined into the paragraph.
         subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; sublist[pre..pro].join(" ") }
-        subs_ints.each {|paragraph| (@result[key][k]||[]) << paragraph }
+        subs_ints.each {|paragraph| (@paragraph[key][k]||[]) << paragraph }
       end
     end
   end
@@ -250,16 +254,30 @@ class SubtitleDownloader
     (words_array - Blacklist.where(word: words_array).pluck(:word))
   end
 
+  # loop over the hashy 10 keys and paragraphs.
+  def paragraph_datasets(name, hashy)
+    hashy.each do |key, para|
+      rhash = nested_hash
+      subs = para.join.split.count_and_hash
+      load_models.each do |dataset|
+        unless @ignore_files.include?(dataset)
+          ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
+          ds.each {|x| rhash[dataset.underscore][x] = para.join.scan(/#{x}/).count if para.join.scan(/#{x}/).present? }
+          if dataset.constantize.where(word: subs.keys).present?
+            found_words = dataset.constantize.where(word: subs.keys).pluck(:word)
+            found_words.each {|word| rhash[dataset.underscore][word.to_sym] = subs[word.to_sym] }
+          end
+        end
+      end
+      topten = (subs.keys - Blacklist.where(word: subs.keys).pluck(:word)).count_and_hash.first(10).to_h
+      (@result[name][key]||[]) << [para, topten, rhash]
+    end
+  end
+
 end
 
 #}}}
 # {{{1 create subtitles words array
-
-# Result paragraphs
-paragraph = Hash.new { |h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
-
-# Remove from iterating over datasets
-ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome"]
 
 # create an instance of subtitles downloader.
 downloader = SubtitleDownloader.new
@@ -277,7 +295,12 @@ downloaded_subs = downloader.create_subtitles_array(file_path_hash)
 
 # create the hash that contains a key:title with a nested hash with value arrays
 # The values are the paragraphs.
-para = downloader.create_paragraphs(downloaded_subs)
+downloader.create_paragraphs(downloaded_subs)
+
+downloader.paragraph.each {|k,v| downloader.paragraph_datasets(k,v) }
+
+binding.pry
+downloader.result
 
 #{{{1 Load datasets
 
@@ -291,5 +314,4 @@ else
 end
 # }}}
 
-binding.pry
-puts "twats"
+#}}}
