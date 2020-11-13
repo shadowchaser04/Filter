@@ -85,7 +85,7 @@ def read_file(arg)
       sanatised << line.gsub(/([^\w\s]|([0-9]|\:|\.))/, "").downcase
   end
   # remove dup lines with uniq then clean up formatting.
-  aa = sanatised.uniq
+  aa = sanatised.uniq.join.split(" ")
   # reject any nil or empty strings
   aa.reject { |item| item.nil? || item == '  ' || item == ' ' || item == '\n' || item == ' \n' }
 end
@@ -125,6 +125,10 @@ private def nested_hash
   Hash.new { |h,k| h[k] = Hash.new(0) }
 end
 
+private def hash_nested_array
+  Hash.new { |h,k| h[k] = [] }
+end
+
 # }}}
 # {{{1 test connection
 #------------------------------------------------------------------------------
@@ -149,73 +153,83 @@ FileUtils.mkdir(root_dir) if !Dir.exist?(root_dir)
 logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 
 # }}}
-# {{{1 download youtube subtitles
+# {{{1 Class SubtitleDownloader
 
-# pass in a date range to the where method returning a collection, then pluck the
-# urls returning an array.
-youtube_urls = Chrome.where(:last_visit => 1.days.ago..1.days.from_now).pluck(:url)
-logger.error("DownloadYoutubeSubtitlesError: no youtube videos for the period #{1.days.ago..1.days.from_now}") if youtube_urls.count == 0
-exit if youtube_urls.count == 0
+class SubtitleDownloader
 
-# loop over the youtube urls.
-youtube_urls.each do |url|
-  begin
-    youtube_subtitles(url)
-  rescue Exception => e
-    puts "#{e}"
+  def initialize
+    @filepaths = hash_nested_array
+    @subtitles = hash_nested_array
   end
-end
 
-# }}}
-# {{{1 create the file path hash
-# create a hash with a array as values
-file_path_hash = Hash.new {|h,k| h[k] = [] }
-
-# create the filepaths.
-subtitle_path = sub_dir(root_dir)
-
-# loop over the file paths to organise them.
-subtitle_path.each do |file|
-
-  # create a key by removing the extention and splicing the basename.
-  f = File.basename(file).split(/\./)[0]
+  # check the existence of the model in the db and that threr are any records.
+  # loop over each record downloading them to the downloads/subs/*
+  def download_subtitles
+    if Chrome.exists? && Chrome.any?
+      chrome = Chrome.where(:last_visit => 1.days.ago..1.days.from_now).pluck(:url)
+      chrome.each {|url| begin; youtube_subtitles(url); rescue Exception => e; puts "#{e}";end }
+    else
+      #logger.error("DownloadSubtitlesError: Please check Chrome Model exists and contains records.")
+      puts "DownloadsSubtitleError"
+      exit
+    end
+  end
 
   # add the file to the hash array.
-  (file_path_hash[f]||[]) << file
+  def subtitles_file_path(directory)
+    # create the filepaths.
+    subtitle_path = sub_dir(directory)
 
-end
+    # loop over the file paths to organise them.
+    # create a key by removing the extention and splicing the basename.
+    subtitle_path.each {|file| f = File.basename(file).split(/\./)[0]; (@filepaths[f]||[]) << file }
 
-# NOTE: logger needs to tell the user what has been removed.
-# remove any videos that have not downloaded both subtitles and json file.
-file_path_hash.reject! { |k,v| v.count != 2 }
-logger.info("Created #{file_path_hash.keys.count} keys in the file_path_hash")
+    # remove any array values that dont have both a json and a vtt file.
+    @filepaths.reject! { |k,v| v.count != 2 }
+    return @filepaths
+  end
 
-# }}}
-# {{{1 build hash containing the subtitles
-#------------------------------------------------------------------------------
-# create the hash for the subtitles
-downloaded_subs = Hash.new { |h,k| h[k] = [] }
+  def create_subtitles_array(path_hash)
+    # loop over the file path hash.
+    path_hash.each do |key, files|
 
-# loop over the file path hash.
-file_path_hash.each do |key, files|
+      # loop over the array values, two files .json and .vtt
+      files.each do |file|
 
-  # loop over the array values, two files .json and .vtt
-  files.each do |file|
+        # find the subtitles by there filetype.
+        if File.extname(file.split("/")[-1]) =~ /.vtt/
+          # create an array of subtitle words then add the subtitles to the hash.
+          (@subtitles[key]||[]) << read_file(file)
 
-    # find the subtitles by there filetype.
-    if File.extname(file.split("/")[-1]) =~ /.vtt/
-      # create an array of sentences read from the subtitles.vtt file.
-      subtitles = read_file(file)
+          # flatten the value array.
+          @subtitles.transform_values! {|value_array| value_array.flatten }
+        end
 
-      # add the subtitles to the hash.
-      (downloaded_subs[key]||[]) << subtitles
-
-      # flatten the value array.
-      downloaded_subs.transform_values! {|value_array| value_array.flatten }
+      end
     end
 
+    return @subtitles
   end
+
 end
+
+#}}}
+# {{{1 create subtitles words array
+
+# create an instance of subtitles downloader.
+downloader = SubtitleDownloader.new
+
+# download the subtitles.
+downloader.download_subtitles
+
+# create a hash of subtitle file paths.
+file_path_hash = downloader.subtitles_file_path(root_dir)
+
+# pass in a hash the key being the spliced file name the value an array of
+# absoulute file paths to the json and vtt files. returning a hash. the key
+# being named after the title the array values the subtitles words array.
+downloaded_subs = downloader.create_subtitles_array(file_path_hash)
+
 # }}}
 # {{{1 remove blacklist and create top ten
 #------------------------------------------------------------------------------
@@ -227,12 +241,9 @@ end
 # blacklisted words.
 result = Hash.new {|h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
 
-downloaded_subs.each do |key, value_array|
+downloaded_subs.each do |key, sublist|
   logger.info("creating paragraphs for #{key}")
   t = Time.new
-
-  # create the array of words.
-  sublist = value_array.join.split(" ")
 
   # Pass in the sublist array to the Where returning an array of badwords
   # subtracted from the sublist.
