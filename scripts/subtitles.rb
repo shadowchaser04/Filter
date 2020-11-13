@@ -4,11 +4,6 @@ require 'pry'
 require 'json'
 require 'logger'
 
-# TODO: down database and models.
-
-# get todays date
-# do i write to file or db as an assosiated record to each video?
-
 # {{{1 format
 #------------------------------------------------------------------------------
 def div
@@ -22,23 +17,31 @@ end
 # {{{1 logger
 #------------------------------------------------------------------------------
 # log app status's
-def logger_output(choice_of_output)
-    Logger.new(choice_of_output,
-    level: Logger::INFO,
-    progname: 'youtube',
-    datetime_format: '%Y-%m-%d %H:%M:%S',
-    formatter: proc do |severity, datetime, progname, msg|
-      "[#{blue(progname)}][#{datetime}], #{severity}: #{msg}\n"
-    end
-  )
+module Logging
+  def logger_output(choice_of_output)
+      Logger.new(choice_of_output,
+      level: Logger::INFO,
+      progname: 'youtube',
+      datetime_format: '%Y-%m-%d %H:%M:%S',
+      formatter: proc do |severity, datetime, progname, msg|
+        "[#{blue(progname)}][#{datetime}], #{severity}: #{msg}\n"
+      end
+    )
+  end
 end
 
+
+include Logging
+
+# create a instance of logger for output to the sdtout
 logger = logger_output(STDOUT)
+
 # log file.
 log_to_logfile = logger_output("logfile.log")
 
 # logger = STDOUT
 logger.info("Program started...")
+
 # }}}
 # {{{1 methods
 #------------------------------------------------------------------------------
@@ -153,13 +156,17 @@ FileUtils.mkdir(root_dir) if !Dir.exist?(root_dir)
 logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 
 # }}}
-# {{{1 Class SubtitleDownloader
+# {{{1 Class: SubtitleDownloader
 
 class SubtitleDownloader
+
+  include Logging
 
   def initialize
     @filepaths = hash_nested_array
     @subtitles = hash_nested_array
+    @result = Hash.new {|h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
+    @logger = logger_output(STDOUT)
   end
 
   # check the existence of the model in the db and that threr are any records.
@@ -169,52 +176,89 @@ class SubtitleDownloader
       chrome = Chrome.where(:last_visit => 1.days.ago..1.days.from_now).pluck(:url)
       chrome.each {|url| begin; youtube_subtitles(url); rescue Exception => e; puts "#{e}";end }
     else
-      #logger.error("DownloadSubtitlesError: Please check Chrome Model exists and contains records.")
-      puts "DownloadsSubtitleError"
+      @logger.error("DownloadSubtitlesError: Please check Chrome Model exists and contains records.")
       exit
     end
   end
 
-  # add the file to the hash array.
+  # loop over the file paths to organise them.
+  # create a key by removing the extention and splicing the basename.
   def subtitles_file_path(directory)
-    # create the filepaths.
     subtitle_path = sub_dir(directory)
 
-    # loop over the file paths to organise them.
-    # create a key by removing the extention and splicing the basename.
-    subtitle_path.each {|file| f = File.basename(file).split(/\./)[0]; (@filepaths[f]||[]) << file }
+    if subtitle_path.present?
+      subtitle_path.each {|file| f = File.basename(file).split(/\./)[0]; (@filepaths[f]||[]) << file }
 
-    # remove any array values that dont have both a json and a vtt file.
-    @filepaths.reject! { |k,v| v.count != 2 }
-    return @filepaths
+      # remove any array values that dont have both a json and a vtt file.
+      @filepaths.reject! { |k,v| v.count != 2 }
+      return @filepaths
+    else
+      @logger.error("SubtitlesFilepathError: there are #{subtitle_path.count} files downloded")
+      exit
+    end
   end
 
   def create_subtitles_array(path_hash)
-    # loop over the file path hash.
-    path_hash.each do |key, files|
+    if path_hash.class == Hash
+      path_hash.each do |key, files|
 
-      # loop over the array values, two files .json and .vtt
-      files.each do |file|
+        # loop over the array values, two files .json and .vtt
+        files.each do |file|
+          # find the subtitles by there filetype.
+          if File.extname(file) =~ /.vtt/
+            # create an array of subtitle words then add the subtitles to the hash.
+            (@subtitles[key]||[]) << read_file(file)
 
-        # find the subtitles by there filetype.
-        if File.extname(file.split("/")[-1]) =~ /.vtt/
-          # create an array of subtitle words then add the subtitles to the hash.
-          (@subtitles[key]||[]) << read_file(file)
-
-          # flatten the value array.
-          @subtitles.transform_values! {|value_array| value_array.flatten }
+            # flatten the value array.
+            @subtitles.transform_values! {|value_array| value_array.flatten }
+          end
         end
+      end
+      return @subtitles
+    else
+      @logger.error("CreateSubtitlesArrayError: options must be a hash.")
+      exit
+    end
+  end
 
+  # Pass in the sublist array to the Where returning an array of blacklisted
+  # words then subtract them from the sublist.
+  # Group the words by themselves then count the words, sort and turn into a hash
+  def create_paragraphs(downloaded_subs)
+    downloaded_subs.each do |key, sublist|
+      subs = (sublist - Blacklist.where(word: sublist).pluck(:word))
+      top_count_hash = subs.count_and_hash(10)
+
+      top_count_hash.keys.each do |k|
+        # loops over the top ten found words, group_by groups all the nested array words
+        # and there index's. This creates a key and an array. The array contains all
+        # occurrence of the word and its index position.
+        subs = sublist.each_with_index.map {|w,i| [w,i] }.group_by {|i| i[0] }
+
+        # k is queried in the hash, if found it returns an array which is flattened.
+        # it is mapped returning only the integers which are the index positions of
+        # the words.
+        subs_ints = subs["#{k}"].flatten.map {|x| Integer(x) rescue nil }.compact
+
+        # subs_ints is remapped permanently altering the array. First it creates a
+        # range of 50 words before and after i. Which is its index position. These
+        # are then joined into the paragraph.
+        subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; sublist[pre..pro].join(" ") }
+        subs_ints.each {|paragraph| (@result[key][k]||[]) << paragraph }
       end
     end
-
-    return @subtitles
   end
 
 end
 
 #}}}
 # {{{1 create subtitles words array
+
+# Result paragraphs
+paragraph = Hash.new { |h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
+
+# Remove from iterating over datasets
+ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome"]
 
 # create an instance of subtitles downloader.
 downloader = SubtitleDownloader.new
@@ -230,60 +274,12 @@ file_path_hash = downloader.subtitles_file_path(root_dir)
 # being named after the title the array values the subtitles words array.
 downloaded_subs = downloader.create_subtitles_array(file_path_hash)
 
-# }}}
-# {{{1 remove blacklist and create top ten
-#------------------------------------------------------------------------------
-# downloaded subs now contains the key:title and an array of the subtitles in
-# sentences. The sentences will be joined and split into a single words array.
-# The array of words is then passed into the Blacklist model using the where
-# method which returns an array of found words as one call. This array is then
-# subtracted from the original subtitles words array (sublist) removing all the
-# blacklisted words.
-result = Hash.new {|h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
+# create the hash that contains a key:title with a nested hash with value arrays
+# The values are the paragraphs.
+downloader.create_paragraphs(downloaded_subs)
 
-downloaded_subs.each do |key, sublist|
-  logger.info("creating paragraphs for #{key}")
-  t = Time.new
+#{{{1 Load datasets
 
-  # Pass in the sublist array to the Where returning an array of badwords
-  # subtracted from the sublist.
-  subs = (sublist - Blacklist.where(word: sublist).pluck(:word))
-
-  # Group the words by themselves then count the words, sort and turn into a hash
-  top_count_hash = subs.count_and_hash(10)
-
-  top_count_hash.keys.each do |k|
-    # loops over the top ten found words, group_by groups all the nested array words
-    # and there index's. This creates a key and an array. The array contains all
-    # occurrence of the word and its index position.
-    subs = sublist.each_with_index.map {|w,i| [w,i] }.group_by {|i| i[0] }
-
-    # k is queried in the hash, if found it returns an array which is flattened.
-    # it is mapped returning only the integers which are the index positions of
-    # the words.
-    subs_ints = subs["#{k}"].flatten.map {|x| Integer(x) rescue nil }.compact
-
-    # subs_ints is remapped permanently altering the array. First it creates a
-    # range of 50 words before and after i. Which is its index position. These
-    # are then joined into the paragraph.
-    subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; sublist[pre..pro].join(" ") }
-    subs_ints.each {|paragraph| (result[key][k]||[]) << paragraph }
-  end
-  logger.info("completed #{key} in #{Time.new - t}")
-end
-
-# }}}
-# {{{1 load datasets
-#------------------------------------------------------------------------------
-# Result paragraphs
-paragraph = Hash.new { |h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
-
-# Remove from iterating over datasets
-ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome"]
-
-#------------------------------------------------------------------------------
-# Load datasets
-#------------------------------------------------------------------------------
 # Eager loads the rails models. If datasets are not present exit and log
 # otherwise print the count to screen.
 if load_models.present?
@@ -294,3 +290,5 @@ else
 end
 # }}}
 
+binding.pry
+puts "twats"
