@@ -182,13 +182,13 @@ subtitle_path.each do |file|
 
   # add the file to the hash array.
   (file_path_hash[f]||[]) << file
-  logger.info("Created key #{f} in the file_path_hash")
 
 end
 
 # NOTE: logger needs to tell the user what has been removed.
 # remove any videos that have not downloaded both subtitles and json file.
 file_path_hash.reject! { |k,v| v.count != 2 }
+logger.info("Created #{file_path_hash.keys.count} keys in the file_path_hash")
 
 # }}}
 # {{{1 build hash containing the subtitles
@@ -217,11 +217,19 @@ file_path_hash.each do |key, files|
   end
 end
 # }}}
-# {{{1 remove blacklist
+# {{{1 remove blacklist and create top ten
 #------------------------------------------------------------------------------
+# downloaded subs now contains the key:title and an array of the subtitles in
+# sentences. The sentences will be joined and split into a single words array.
+# The array of words is then passed into the Blacklist model using the where
+# method which returns an array of found words as one call. This array is then
+# subtracted from the original subtitles words array (sublist) removing all the
+# blacklisted words.
 result = Hash.new {|h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
 
 downloaded_subs.each do |key, value_array|
+  logger.info("creating paragraphs for #{key}")
+  t = Time.new
 
   # create the array of words.
   sublist = value_array.join.split(" ")
@@ -250,14 +258,14 @@ downloaded_subs.each do |key, value_array|
     subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; sublist[pre..pro].join(" ") }
     subs_ints.each {|paragraph| (result[key][k]||[]) << paragraph }
   end
+  logger.info("completed #{key} in #{Time.new - t}")
 end
-binding.pry
 
 # }}}
 # {{{1 load datasets
 #------------------------------------------------------------------------------
 # Result paragraphs
-paragraph = Hash.new { |h,k| h[k] = [] }
+paragraph = Hash.new { |h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
 
 # Remove from iterating over datasets
 ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome"]
@@ -274,57 +282,4 @@ else
   exit
 end
 # }}}
-# {{{1 main
-#------------------------------------------------------------------------------
-# Loop over each dataset
-result.each do |k, paragraph_array|
-  logger.info("paragraph count is #{paragraph_array.count} for #{k}")
-  # create a marker for time to log each loops rate of build.
-  t=Time.now
 
-  # Loop each individual paragraph belonging to a key.
-  # The each with object takes a hash with nested hashes set to 0.
-  # Iterates over a collection, passing the current element and the memo to the
-  # block
-  # nested_hash is a private method
-  paragraph_array.flatten.each do |para|
-
-    # create a nested hash with default value as 0
-    rhash = nested_hash
-
-    # Hash the para array and count.
-    subs = para.split(" ").group_by(&:itself).transform_values(&:count).to_h
-
-    # Rails_models are each dataset the words will be ran against.
-    load_models.each do |dataset|
-      unless ignore_files.include?(dataset)
-        #----------------------------------------------------------------------
-        # words and sentence
-        #----------------------------------------------------------------------
-        # Pluck all the words form the dataset. Filter out any words leaving
-        # only sentences. Loop over each sentence, scanning the paragraph of
-        # text (which is a string) for all occurrences of the sentence.
-        ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
-        ds.each {|x| rhash["#{dataset.underscore}"][x] = para.scan(/#{x}/).count if para.scan(/#{x}/).count >= 1 }
-
-        # Create a array of words from the database.
-        if dataset.constantize.where(word: subs.keys).present?
-
-          # Where takes an array. In this case each key from the subs.keys
-          # hash. And returns an array in one call of each found word.
-          found_words = dataset.constantize.where(word: subs.keys)
-
-          # Loop over the found words. Creating the hash per paragraph.
-          found_words.each { |word| rhash["#{dataset.underscore}"][word[:word]] = subs[word[:word]] }
-        end
-      end
-    end
-    #--------------------------------------------------------------------------
-    # build paragraph
-    #--------------------------------------------------------------------------
-    # Add the paragraph and dataset hash back into the array under its key
-    (paragraph[k]||[]) << para
-  end
-  logger.info("Built #{k} in: #{Time.now - t}")
-end
-#}}}
