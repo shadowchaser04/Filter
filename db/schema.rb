@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2020_11_11_002042) do
+ActiveRecord::Schema.define(version: 2020_11_14_031507) do
 
   create_table "actors", force: :cascade do |t|
     t.string "word"
@@ -191,6 +191,13 @@ ActiveRecord::Schema.define(version: 2020_11_11_002042) do
     t.string "word"
   end
 
+  create_table "subtitles", force: :cascade do |t|
+    t.json "paragraph"
+    t.integer "youtube_result_id", null: false
+    t.string "title"
+    t.index ["youtube_result_id"], name: "index_subtitles_on_youtube_result_id"
+  end
+
   create_table "tennis", force: :cascade do |t|
     t.string "word"
   end
@@ -236,5 +243,6 @@ ActiveRecord::Schema.define(version: 2020_11_11_002042) do
     t.index ["user_id"], name: "index_youtube_results_on_user_id"
   end
 
+  add_foreign_key "subtitles", "youtube_results"
   add_foreign_key "youtube_results", "users"
 end

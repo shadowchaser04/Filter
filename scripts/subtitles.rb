@@ -124,7 +124,7 @@ def load_models
   return ApplicationRecord.descendants.collect { |type| type.name }
 end
 
-private def nested_hash
+private def nested_hash_default
   Hash.new { |h,k| h[k] = Hash.new(0) }
 end
 
@@ -133,44 +133,23 @@ private def hash_nested_array
 end
 
 # }}}
-# {{{1 test connection
-#------------------------------------------------------------------------------
-log_to_logfile.error("Program Close: Database does not exist.") unless database_exists?
-exit unless database_exists?
-
-# test whether then db returns true or false on the user or kicks an error.
-# if not this will exit the program.
-has_db_been_populated
-# }}}
-# {{{1 remove old directories
-#------------------------------------------------------------------------------
-# root directory
-root_dir = "/Users/shadowchaser/Downloads/Youtube_Subtitles/Subs"
-
-# remove the directory so its empty
-FileUtils.remove_dir(root_dir) if Dir.exist?(root_dir)
-logger.info("removed #{root_dir}") if !Dir.exist?(root_dir)
-
-# remake the directory so its empty
-FileUtils.mkdir(root_dir) if !Dir.exist?(root_dir)
-logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
-
-# }}}
 # {{{1 Class: SubtitleDownloader
 
 class SubtitleDownloader
 
-  attr_accessor :paragraph, :result
+  attr_accessor :paragraph, :added_paragraph_dataset, :topics_values_summed
 
   include Logging
 
   def initialize
     @filepaths = hash_nested_array
     @subtitles = hash_nested_array
+    @topics_values_summed = nested_hash_default
     @paragraph = Hash.new {|h,k| h[k] = Hash.new {|hash, key| hash[key] = [] }}
-    @result = Hash.new {|h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
+    @added_paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
     @logger = logger_output(STDOUT)
-    @ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome"]
+    # NOTE: any models none dataset
+    @ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
   end
 
   # check the existence of the model in the db and that threr are any records.
@@ -256,7 +235,7 @@ class SubtitleDownloader
   # loop over the hashy 10 keys and paragraphs.
   def paragraph_datasets(name, hashy)
     hashy.each do |key, para|
-      rhash = nested_hash
+      rhash = nested_hash_default
       subs = para.join.split.count_and_hash
 
       load_models.each do |dataset|
@@ -273,62 +252,50 @@ class SubtitleDownloader
       topten = (subs.keys - Blacklist.where(word: subs.keys).pluck(:word)).count_and_hash.first(10).to_h
 
       # iterate over the paragraphs so as to avoid nesting array.
-      (@result[name][key]||[]) << [para,topten,rhash]
+      (@added_paragraph_dataset[name][key]||[]) << [para,topten,rhash]
 
       # remove additional nested array layer.
-      @result[name].transform_values!(&:flatten)
+      @added_paragraph_dataset[name].transform_values!(&:flatten)
+    end
+  end
+
+  # two layerd hash. Hash with hash - values. results are pushed to the
+  # topics_counted hash accessed through the attr_accessor.
+  def sum_topic_values(hashy)
+    hashy.each do |title,v|
+      v.each do |key, value|
+        value[-1].each {|k,v| @topics_values_summed[title][k] += v.values.sum }
+      end
     end
   end
 
 end
 
 #}}}
-# {{{1 create subtitles words array
+# {{{1 test connection
+#------------------------------------------------------------------------------
+log_to_logfile.error("Program Close: Database does not exist.") unless database_exists?
+exit unless database_exists?
 
-# create an instance of subtitles downloader.
-downloader = SubtitleDownloader.new
+# test whether then db returns true or false on the user or kicks an error.
+# if not this will exit the program.
+has_db_been_populated
+# }}}
+# {{{1 remove old directories
+#------------------------------------------------------------------------------
+# root directory
+root_dir = "/Users/shadowchaser/Downloads/Youtube_Subtitles/Subs"
 
-# download the subtitles.
-downloader.download_subtitles
+# remove the directory so its empty
+FileUtils.remove_dir(root_dir) if Dir.exist?(root_dir)
+logger.info("removed #{root_dir}") if !Dir.exist?(root_dir)
 
-# create a hash of subtitle file paths.
-file_path_hash = downloader.subtitles_file_path(root_dir)
+# remake the directory so its empty
+FileUtils.mkdir(root_dir) if !Dir.exist?(root_dir)
+logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 
-# pass in a hash the key being the spliced file name the value an array of
-# absoulute file paths to the json and vtt files. returning a hash. the key
-# being named after the title the array values the subtitles words array.
-downloaded_subs = downloader.create_subtitles_array(file_path_hash)
-
-# create the hash that contains a key:title with a nested hash with value arrays
-# The values are the paragraphs.
-downloader.create_paragraphs(downloaded_subs)
-
-# pass in the title and the hash of 10 keys and paragraphs.
-downloader.paragraph.each {|k,v| downloader.paragraph_datasets(k,v) }
-
-topics = Hash.new {|h,k| h[k] = Hash.new(0) }
-
-downloader.result.each do |title,v|
-  v.each do |key, value|
-    value[-1].each {|k,v| topics[title][k] += v.values.sum }
-  end
-end
-
-topics.each do |title, value|
-
-  file = file_path_hash[title][0] if File.extname(file_path_hash[title][0]) =~ /.json/
-  data = JSON.parse(File.read(file))
-
-  yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
-  re = yt_user.youtube_results.find_or_create_by(title: data['title'])
-  re.update(duration: data['duration'], meta_data: {total: topics[title]})
-
-end
-
-
-
-#{{{1 Load datasets
-
+# }}}
+#{{{1 load datasets
 # Eager loads the rails models. If datasets are not present exit and log
 # otherwise print the count to screen.
 if load_models.present?
@@ -336,6 +303,54 @@ if load_models.present?
 else
   log_to_logfile.error("#{load_models.count} datasets were found.")
   exit
+end
+#}}}
+# {{{1 create subtitles words array
+# create an instance of subtitles downloader.
+downloader = SubtitleDownloader.new
+
+# Download the subtitles.
+downloader.download_subtitles
+
+# Create a hash of subtitle file paths.
+file_path_hash = downloader.subtitles_file_path(root_dir)
+
+# Pass in a hash the key being the spliced file name. The value is an array of
+# absoulute file paths to the json and vtt files, this returns a hash. The key
+# is named after the title and the array values are the subtitle words array.
+downloaded_subs = downloader.create_subtitles_array(file_path_hash)
+
+# Create a hash that contains the video titles as the keys, and nested hashes as
+# value arrays. The values are the paragraphs.
+downloader.create_paragraphs(downloaded_subs)
+
+# Setter Hash: pass in the title and hash from paragraphs, which contains 10 keys
+# with corrisponding paragraphs to the paragraph_datasets method. This will
+# create the dataset topic information and the topten counted words.
+downloader.paragraph.each {|k,h| downloader.paragraph_datasets(k,h) }
+
+# Setter Hash: paragraphs, datasets topics and topten from the paragraph_datasets
+topics_hash = downloader.added_paragraph_dataset
+
+# Sum each value of the nested hash array. returning topics_values_summed.
+downloader.sum_topic_values(topics_hash)
+
+# Setter Hash: final hash with paragraphs topics and topten counted words.
+topics = downloader.topics_values_summed
+
+topics.each do |title, value|
+
+  next unless File.extname(file_path_hash[title][0]) =~ /.json/
+  file = file_path_hash[title][0]
+  data = JSON.parse(File.read(file))
+
+  # find the user and make the assosiation then update meta and duration.
+  yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
+  re = yt_user.youtube_results.find_or_create_by(title: data['title'])
+  re.update(duration: data['duration'], meta_data: {total: topics[title]})
+  # NOTE: find might not be finding if the record exists.
+  re.subtitles.find_or_create_by(title:title, paragraph: topics[title])
+
 end
 # }}}
 
