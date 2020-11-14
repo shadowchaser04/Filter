@@ -194,8 +194,7 @@ class SubtitleDownloader
     subtitle_path = sub_dir(directory)
     if subtitle_path.present?
       subtitle_path.each {|file| f = File.basename(file).split(/\./)[0]; (@filepaths[f]||[]) << file }
-      @filepaths.reject! { |k,v| v.count != 2 }
-      return @filepaths
+      return @filepaths.reject! { |k,v| v.count != 2 }
     else
       @logger.error("SubtitlesFilepathError: there are #{subtitle_path.count} files downloded")
       exit
@@ -259,6 +258,7 @@ class SubtitleDownloader
     hashy.each do |key, para|
       rhash = nested_hash
       subs = para.join.split.count_and_hash
+
       load_models.each do |dataset|
         unless @ignore_files.include?(dataset)
           ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
@@ -269,8 +269,14 @@ class SubtitleDownloader
           end
         end
       end
+      # topten list after removing blacklist
       topten = (subs.keys - Blacklist.where(word: subs.keys).pluck(:word)).count_and_hash.first(10).to_h
-      (@result[name][key]||[]) << [para, topten, rhash]
+
+      # iterate over the paragraphs so as to avoid nesting array.
+      (@result[name][key]||[]) << [para,topten,rhash]
+
+      # remove additional nested array layer.
+      @result[name].transform_values!(&:flatten)
     end
   end
 
@@ -297,10 +303,29 @@ downloaded_subs = downloader.create_subtitles_array(file_path_hash)
 # The values are the paragraphs.
 downloader.create_paragraphs(downloaded_subs)
 
+# pass in the title and the hash of 10 keys and paragraphs.
 downloader.paragraph.each {|k,v| downloader.paragraph_datasets(k,v) }
 
-binding.pry
-downloader.result
+topics = Hash.new {|h,k| h[k] = Hash.new(0) }
+
+downloader.result.each do |title,v|
+  v.each do |key, value|
+    value[-1].each {|k,v| topics[title][k] += v.values.sum }
+  end
+end
+
+topics.each do |title, value|
+
+  file = file_path_hash[title][0] if File.extname(file_path_hash[title][0]) =~ /.json/
+  data = JSON.parse(File.read(file))
+
+  yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
+  re = yt_user.youtube_results.find_or_create_by(title: data['title'])
+  re.update(duration: data['duration'], meta_data: {total: topics[title]})
+
+end
+
+
 
 #{{{1 Load datasets
 
@@ -314,4 +339,3 @@ else
 end
 # }}}
 
-#}}}
