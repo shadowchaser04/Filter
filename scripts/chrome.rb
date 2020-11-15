@@ -6,6 +6,7 @@ require 'logger'
 require 'sqlite3'
 require 'active_record'
 
+# TODO: add safari support
 #{{{1 methods
 # google chrome history
 def connect_to_chrome

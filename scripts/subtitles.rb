@@ -93,16 +93,6 @@ def read_file(arg)
   aa.reject { |item| item.nil? || item == '  ' || item == ' ' || item == '\n' || item == ' \n' }
 end
 
-# Uses youtube-dl's auto sub generate downloader. downloads to ~/Downloads/Youtube
-def youtube_subtitles(address)
-    system("youtube-dl --write-auto-sub --sub-format best --no-playlist --sub-lang en --skip-download --write-info-json \'#{address}\'")
-end
-
-# Creates and array of absolute filepaths.
-def sub_dir(directory_location)
-    Dir.glob(directory_location + "/**/*").select{ |f| File.file? f }
-end
-
 # test whether then db returns true or false on the user or kicks an error.
 def has_db_been_populated
   begin
@@ -152,6 +142,16 @@ class SubtitleDownloader
     @ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
   end
 
+  # Uses youtube-dl's auto sub generate downloader. downloads to ~/Downloads/Youtube
+  def youtube_subtitles(address)
+      system("youtube-dl --write-auto-sub --sub-format best --no-playlist --sub-lang en --skip-download --write-info-json \'#{address}\'")
+  end
+
+  # Creates and array of absolute filepaths.
+  def sub_dir(directory_location)
+      Dir.glob(directory_location + "/**/*").select{ |f| File.file? f }
+  end
+
   # check the existence of the model in the db and that there are any records.
   # loop over each record downloading them to the ~/downloads/subs/*
   def download_subtitles(date_range=1)
@@ -199,6 +199,10 @@ class SubtitleDownloader
     return @subtitles
   end
 
+  def remove_blacklisted_words_from(words_array)
+    (words_array - Blacklist.where(word: words_array).pluck(:word))
+  end
+
   # Pass in the sublist array to the Where returning an array of blacklisted
   # words then subtract them from the sublist.
   # Group the words by themselves then count the words, sort and turn into a hash
@@ -226,10 +230,6 @@ class SubtitleDownloader
     end
   end
 
-  def remove_blacklisted_words_from(words_array)
-    (words_array - Blacklist.where(word: words_array).pluck(:word))
-  end
-
   # loop over the hashy 10 keys and paragraphs.
   def paragraph_datasets(name, hashy)
     hashy.each do |key, para|
@@ -240,6 +240,7 @@ class SubtitleDownloader
         unless @ignore_files.include?(dataset)
           ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
           ds.each {|x| rhash[dataset.underscore][x] = para.join.scan(/#{x}/).count if para.join.scan(/#{x}/).present? }
+
           if dataset.constantize.where(word: subs.keys).present?
             found_words = dataset.constantize.where(word: subs.keys).pluck(:word)
             found_words.each {|word| rhash[dataset.underscore][word.to_sym] = subs[word.to_sym] }
