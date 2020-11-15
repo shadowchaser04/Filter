@@ -4,6 +4,8 @@ require 'pry'
 require 'json'
 require 'logger'
 
+# TODO: add error handling. classes
+# TODO: bring in the Class Total
 # {{{1 format
 #------------------------------------------------------------------------------
 def div
@@ -62,9 +64,10 @@ def syllable_count(word)
 end
 
 class Array
+  # NOTE removing symbolize_keys
   # Counts each occurence of the word by the group_by method and hashes the result.
   def count_and_hash
-    self.group_by(&:itself).transform_values(&:count).sort_by{|k, v| v}.reverse.to_h.symbolize_keys
+    self.group_by(&:itself).transform_values(&:count).sort_by{|k, v| v}.reverse.to_h
   end
 end
 
@@ -227,28 +230,28 @@ class SubtitleDownloader
     end
   end
 
+  # NOTE: name is not checked.
+  # NOTE: it doesnt check if the hash contains anything.
   # loop over the hashy 10 keys and paragraphs.
   def paragraph_datasets(name, hashy)
     raise ArgumentError, "Argument must be a Hash" unless hashy.class == Hash
     hashy.each do |key, para|
       rhash = nested_hash_default
       subs = para.join.split.count_and_hash
-
-      # NOTE: this is a method loaded pre the creation of the class SubtitleDownloader
       load_models.each do |dataset|
         unless @ignore_files.include?(dataset)
           ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
           ds.each {|x| rhash[dataset.underscore][x] = para.join.scan(/#{x}/).count if para.join.scan(/#{x}/).present? }
-
           if dataset.constantize.where(word: subs.keys).present?
             found_words = dataset.constantize.where(word: subs.keys).pluck(:word)
-            found_words.each {|word| rhash[dataset.underscore][word.to_sym] = subs[word.to_sym] }
+            found_words.each {|word| rhash[dataset.underscore.to_sym][word.to_sym] = subs[word] }
           end
         end
       end
       # create topten count of words. Add the paragraphs topten and topics.
       # Flatten out the additional created array.
-      topten = remove_blacklisted_words_from(subs.keys).count_and_hash.first(10).to_h
+      topten = remove_blacklisted_words_from(para.join.split).count_and_hash.first(10).to_h.symbolize_keys
+      binding.pry
       (@added_paragraph_dataset[name][key]||[]) << [para,topten,rhash]
       @added_paragraph_dataset[name].transform_values!(&:flatten)
     end
@@ -264,20 +267,27 @@ class SubtitleDownloader
     end
   end
 
+  def topten
+    hashy = Hash.new {|h,k| h[k] = Hash.new }
+    @subtitles.each {|k, subs| hashy[k] = remove_blacklisted_words_from(subs).count_and_hash.first(10).to_h }
+    return hashy
+  end
 
   # args[0] title. args[1] value
-  def build_database(*args)
-    title = args[0]
-    file = @filepaths[title][:json]
-    topics = topics_values_summed
-    data = JSON.parse(File.read(file))
-    @logger.info("Creating: #{title} for User: #{data['uploader']}.")
+  def build_database
+    @added_paragraph_dataset.each do |k,para|
+      file = @filepaths[k][:json]
+      top = topten
+      data = JSON.parse(File.read(file))
+      @logger.info("Creating: #{k} for User: #{data['uploader']}.")
 
-    # find the user and make the assosiation then update meta and duration.
-    yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
-    re = yt_user.youtube_results.find_or_create_by(title: data['title'])
-    re.update(duration: data['duration'], meta_data: {total: topics[title], topten: args[1]})
-    re.subtitles.find_or_create_by(title:title, paragraph: topics[title])
+      # NOTE: needs topten adding
+      # find the user and make the assosiation then update meta and duration.
+      yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
+      re = yt_user.youtube_results.find_or_create_by(title: data['title'])
+      re.update(duration: data['duration'], meta_data: {total: @topics_values_summed[k], topten: top[k]})
+      re.subtitles.find_or_create_by(title:data['title'], paragraph:para)
+    end
   end
 
 end
@@ -349,9 +359,7 @@ topics_hash = downloader.added_paragraph_dataset
 downloader.sum_topic_values(topics_hash)
 
 # Setter Hash: final hash with paragraphs topics and topten counted words.
-topics = downloader.topics_values_summed
-
-#
-topics.each {|title, value| downloader.build_database(title, value) }
+downloader.topics_values_summed
+downloader.build_database
 
 # }}}

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2020_11_14_031507) do
+ActiveRecord::Schema.define(version: 2020_11_14_030002) do
 
   create_table "actors", force: :cascade do |t|
     t.string "word"
@@ -36,19 +36,15 @@ ActiveRecord::Schema.define(version: 2020_11_14_031507) do
     t.string "word"
   end
 
-  create_table "bummings", force: :cascade do |t|
-    t.string "word"
-  end
-
   create_table "cars", force: :cascade do |t|
     t.string "word"
   end
 
   create_table "chromes", force: :cascade do |t|
+    t.string "title"
     t.string "url"
     t.integer "visit_count"
     t.datetime "last_visit"
-    t.string "title"
   end
 
   create_table "colors", force: :cascade do |t|
@@ -96,10 +92,6 @@ ActiveRecord::Schema.define(version: 2020_11_14_031507) do
   end
 
   create_table "illnesses", force: :cascade do |t|
-    t.string "word"
-  end
-
-  create_table "karates", force: :cascade do |t|
     t.string "word"
   end
 
@@ -192,14 +184,10 @@ ActiveRecord::Schema.define(version: 2020_11_14_031507) do
   end
 
   create_table "subtitles", force: :cascade do |t|
+    t.string "title"
     t.json "paragraph"
     t.integer "youtube_result_id", null: false
-    t.string "title"
     t.index ["youtube_result_id"], name: "index_subtitles_on_youtube_result_id"
-  end
-
-  create_table "tennis", force: :cascade do |t|
-    t.string "word"
   end
 
   create_table "tertiary_colors", force: :cascade do |t|
