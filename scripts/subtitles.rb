@@ -105,12 +105,11 @@ def has_db_been_populated
   end
 end
 
+# eager load the models keep it outside the loop so its only called once.
+# For Rails5 models are now subclasses of ApplicationRecord so to get the list
+# of all models in your app you do:
 def load_models
-  # eager load the models keep it outside the loop so its only called once.
   Rails.application.eager_load!
-
-  # For Rails5 models are now subclasses of ApplicationRecord so to get the list
-  # of all models in your app you do:
   return ApplicationRecord.descendants.collect { |type| type.name }
 end
 
@@ -138,7 +137,6 @@ class SubtitleDownloader
     @paragraph = Hash.new {|h,k| h[k] = Hash.new {|hash, key| hash[key] = [] }}
     @added_paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
     @logger = logger_output(STDOUT)
-    # NOTE: any models none dataset
     @ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
   end
 
@@ -203,39 +201,40 @@ class SubtitleDownloader
     (words_array - Blacklist.where(word: words_array).pluck(:word))
   end
 
-  # Pass in the sublist array to the Where returning an array of blacklisted
-  # words then subtract them from the sublist.
-  # Group the words by themselves then count the words, sort and turn into a hash
   def create_paragraphs(downloaded_subs)
-    downloaded_subs.each do |key, sublist|
-      top_count_hash = remove_blacklisted_words_from(sublist).count_and_hash.first(10).to_h
+    raise ArgumentError, "argument must be a Hash" unless downloaded_subs.class == Hash
+    if downloaded_subs.present?
+      downloaded_subs.each do |key, sublist|
+        top_count_hash = remove_blacklisted_words_from(sublist).count_and_hash.first(10).to_h
+        top_count_hash.keys.each do |k|
+          # group_by groups all the words and there index's
+          # This creates a key and an array. The array contains all
+          # occurrence of the word and its index position.
+          subs = sublist.each_with_index.map {|w,i| [w,i] }.group_by {|i| i[0] }
 
-      top_count_hash.keys.each do |k|
-        # loops over the top ten found words, group_by groups all the nested array words
-        # and there index's. This creates a key and an array. The array contains all
-        # occurrence of the word and its index position.
-        subs = sublist.each_with_index.map {|w,i| [w,i] }.group_by {|i| i[0] }
+          # k is queried, if found it returns an array which is flattened. it is
+          # mapped returning only the integers which are the index positions of
+          # the words.
+          subs_ints = subs["#{k}"].flatten.map {|x| Integer(x) rescue nil }.compact
 
-        # k is queried in the hash, if found it returns an array which is flattened.
-        # it is mapped returning only the integers which are the index positions of
-        # the words.
-        subs_ints = subs["#{k}"].flatten.map {|x| Integer(x) rescue nil }.compact
-
-        # subs_ints is remapped permanently altering the array. First it creates a
-        # range of 50 words before and after i. Which is its index position. These
-        # are then joined into the paragraph.
-        subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; sublist[pre..pro].join(" ") }
-        subs_ints.each {|paragraph| (@paragraph[key][k]||[]) << paragraph }
+          # subs_ints is remapped permanently altering the array. First it creates a
+          # range of 50 words before and after i. Which is its index position. These
+          # are then joined into the paragraph.
+          subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; sublist[pre..pro].join(" ") }
+          subs_ints.each {|paragraph| (@paragraph[key][k]||[]) << paragraph }
+        end
       end
     end
   end
 
   # loop over the hashy 10 keys and paragraphs.
   def paragraph_datasets(name, hashy)
+    raise ArgumentError, "Argument must be a Hash" unless hashy.class == Hash
     hashy.each do |key, para|
       rhash = nested_hash_default
       subs = para.join.split.count_and_hash
 
+      # NOTE: this is a method loaded pre the creation of the class SubtitleDownloader
       load_models.each do |dataset|
         unless @ignore_files.include?(dataset)
           ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
@@ -247,13 +246,10 @@ class SubtitleDownloader
           end
         end
       end
-      # topten list after removing blacklist
+      # create topten count of words. Add the paragraphs topten and topics.
+      # Flatten out the additional created array.
       topten = remove_blacklisted_words_from(subs.keys).count_and_hash.first(10).to_h
-
-      # iterate over the paragraphs so as to avoid nesting array.
       (@added_paragraph_dataset[name][key]||[]) << [para,topten,rhash]
-
-      # remove additional nested array layer.
       @added_paragraph_dataset[name].transform_values!(&:flatten)
     end
   end
@@ -266,6 +262,22 @@ class SubtitleDownloader
         value[-1].each {|k,v| @topics_values_summed[title][k] += v.values.sum }
       end
     end
+  end
+
+
+  # args[0] title. args[1] value
+  def build_database(*args)
+    title = args[0]
+    file = @filepaths[title][:json]
+    topics = topics_values_summed
+    data = JSON.parse(File.read(file))
+    @logger.info("Creating: #{title} for User: #{data['uploader']}.")
+
+    # find the user and make the assosiation then update meta and duration.
+    yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
+    re = yt_user.youtube_results.find_or_create_by(title: data['title'])
+    re.update(duration: data['duration'], meta_data: {total: topics[title], topten: args[1]})
+    re.subtitles.find_or_create_by(title:title, paragraph: topics[title])
   end
 
 end
@@ -312,20 +324,22 @@ downloader = SubtitleDownloader.new
 downloader.download_subtitles(1)
 
 # Create a hash of subtitle file paths.
+# Key: file name, Value: Hash - K:filetype V:fullpath
 file_path_hash = downloader.subtitles_file_path(root_dir)
+logger.info("Downloaded #{file_path_hash.keys.count} subtitles") if file_path_hash.present?
 
-# Pass in a hash the key being the spliced file name. The value is an array of
-# absoulute file paths to the json and vtt files, this returns a hash. The key
-# is named after the title and the array values are the subtitle words array.
+# Pass in the return value of the file_path_hash. This returns a hash.
+# Key: title, Value: Array of subtitle words.
 downloaded_subs = downloader.create_subtitles_array(file_path_hash)
+logger.info("Created #{downloaded_subs.count} subtitles words arrays.") if downloaded_subs.present?
 
-# Create a hash that contains the video titles as the keys, and nested hashes as
-# value arrays. The values are the paragraphs.
+# Create a hash.
+# Key: video title, Value: value arrays. The values are the paragraphs.
 downloader.create_paragraphs(downloaded_subs)
 
-# Setter Hash: pass in the title and hash from paragraphs, which contains 10 keys
-# with corrisponding paragraphs to the paragraph_datasets method. This will
-# create the dataset topic information and the topten counted words.
+# Setter Hash:
+# pass in the title and hash from paragraphs, which contains 10 keys.
+# This will create the dataset topic information and the topten counted words.
 downloader.paragraph.each {|k,h| downloader.paragraph_datasets(k,h) }
 
 # Setter Hash: paragraphs, datasets topics and topten from the paragraph_datasets
@@ -337,18 +351,7 @@ downloader.sum_topic_values(topics_hash)
 # Setter Hash: final hash with paragraphs topics and topten counted words.
 topics = downloader.topics_values_summed
 
-topics.each do |title, value|
+#
+topics.each {|title, value| downloader.build_database(title, value) }
 
-  file = file_path_hash[title][:json]
-  data = JSON.parse(File.read(file))
-
-  # find the user and make the assosiation then update meta and duration.
-  yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
-  re = yt_user.youtube_results.find_or_create_by(title: data['title'])
-  re.update(duration: data['duration'], meta_data: {total: topics[title]})
-  # NOTE: find might not be finding if the record exists.
-  re.subtitles.find_or_create_by(title:title, paragraph: topics[title])
-
-end
 # }}}
-
