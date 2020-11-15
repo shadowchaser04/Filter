@@ -142,7 +142,7 @@ class SubtitleDownloader
   include Logging
 
   def initialize
-    @filepaths = hash_nested_array
+    @filepaths = Hash.new {|h,k| h[k] = Hash.new }
     @subtitles = hash_nested_array
     @topics_values_summed = nested_hash_default
     @paragraph = Hash.new {|h,k| h[k] = Hash.new {|hash, key| hash[key] = [] }}
@@ -152,13 +152,14 @@ class SubtitleDownloader
     @ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
   end
 
-  # check the existence of the model in the db and that threr are any records.
-  # loop over each record downloading them to the downloads/subs/*
-  def download_subtitles
+  # check the existence of the model in the db and that there are any records.
+  # loop over each record downloading them to the ~/downloads/subs/*
+  def download_subtitles(date_range=1)
     if Chrome.exists? && Chrome.any?
-      chrome = Chrome.where(:last_visit => 1.days.ago..1.days.from_now).pluck(:url)
-      @logger.info("Found #{chrome.count} chrome records for the period #{1.days.ago.strftime("%A, %d %b %Y ")} untill #{Time.now.strftime("%A, %d %b %Y ")}")
-      chrome.each {|url| begin; youtube_subtitles(url); rescue Exception => e; puts "#{e}";end }
+      raise ArgumentError, "argument must be a Integer" unless date_range.class == Integer
+        chrome = Chrome.where(:last_visit => date_range.days.ago..date_range.days.from_now).pluck(:url)
+        @logger.info("Found #{chrome.count} chrome records for the period #{date_range.days.ago.strftime("%A, %d %b %Y ")} untill #{Time.now.strftime("%A, %d %b %Y ")}")
+        chrome.each {|url| begin; youtube_subtitles(url); rescue Exception => e; puts "#{e}";end }
     else
       @logger.error("DownloadSubtitlesError: Please check Chrome Model exists and contains records.")
       exit
@@ -172,8 +173,13 @@ class SubtitleDownloader
   def subtitles_file_path(directory)
     subtitle_path = sub_dir(directory)
     if subtitle_path.present?
-      subtitle_path.each {|file| f = File.basename(file).split(/\./)[0]; (@filepaths[f]||[]) << file }
-      return @filepaths.reject! { |k,v| v.count != 2 }
+      subtitle_path.each do |file|
+        f = File.basename(file).split(/\./)[0]
+        type = File.extname(file).split(/\./)[1]
+        @filepaths[f][type.to_sym] = file
+      end
+      @filepaths.reject! { |k,v| v.count != 2 }
+      return @filepaths
     else
       @logger.error("SubtitlesFilepathError: there are #{subtitle_path.count} files downloded")
       exit
@@ -185,20 +191,12 @@ class SubtitleDownloader
   # hash using the original key. Then flatten the values array because it has
   # an additional nested level that is unnecessary.
   def create_subtitles_array(path_hash)
-    if path_hash.class == Hash
-      path_hash.each do |key, files|
-        files.each do |file|
-          if File.extname(file) =~ /.vtt/
-            (@subtitles[key]||[]) << read_file(file)
-            @subtitles.transform_values! {|value_array| value_array.flatten }
-          end
-        end
-      end
-      return @subtitles
-    else
-      @logger.error("CreateSubtitlesArrayError: options must be a hash.")
-      exit
+    raise ArgumentError, "argument must be a Hash" unless path_hash.class == Hash
+    path_hash.each do |key, file|
+      (@subtitles[key]||[]) << read_file(file[:vtt]) if file[:vtt]
+      @subtitles.transform_values! {|v| v.flatten } if file[:vtt]
     end
+    return @subtitles
   end
 
   # Pass in the sublist array to the Where returning an array of blacklisted
@@ -249,7 +247,7 @@ class SubtitleDownloader
         end
       end
       # topten list after removing blacklist
-      topten = (subs.keys - Blacklist.where(word: subs.keys).pluck(:word)).count_and_hash.first(10).to_h
+      topten = remove_blacklisted_words_from(subs.keys).count_and_hash.first(10).to_h
 
       # iterate over the paragraphs so as to avoid nesting array.
       (@added_paragraph_dataset[name][key]||[]) << [para,topten,rhash]
@@ -309,8 +307,8 @@ end
 # create an instance of subtitles downloader.
 downloader = SubtitleDownloader.new
 
-# Download the subtitles.
-downloader.download_subtitles
+# Download the subtitles. Arg = Int. How many days backwards in the history.
+downloader.download_subtitles(1)
 
 # Create a hash of subtitle file paths.
 file_path_hash = downloader.subtitles_file_path(root_dir)
@@ -340,8 +338,7 @@ topics = downloader.topics_values_summed
 
 topics.each do |title, value|
 
-  next unless File.extname(file_path_hash[title][0]) =~ /.json/
-  file = file_path_hash[title][0]
+  file = file_path_hash[title][:json]
   data = JSON.parse(File.read(file))
 
   # find the user and make the assosiation then update meta and duration.
