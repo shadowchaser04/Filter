@@ -149,7 +149,8 @@ class SubtitleDownloader
 
   # Creates and array of absolute filepaths.
   def sub_dir(directory_location)
-      Dir.glob(directory_location + "/**/*").select{ |f| File.file? f }
+    raise ArgumentError, "Argument must be a String" unless directory_location.class == String
+    Dir.glob(directory_location + "/**/*").select{ |f| File.file? f }
   end
 
   # Subtract the words returned from the Blacklist call from the words_array.
@@ -173,15 +174,14 @@ class SubtitleDownloader
   # Strip the filetype .json and .vtt and create a key, Add the file to the value.
   def subtitles_file_path
     subtitle_path = sub_dir(@root_dir)
-    if subtitle_path.present?
+    return unless subtitle_path.present?
       subtitle_path.each do |file|
-        f = File.basename(file).split(/\./)[0]
+        name = File.basename(file).split(/\./)[0]
         type = File.extname(file).split(/\./)[1]
-        @filepaths[f][type.to_sym] = file
+        @filepaths[name][type.to_sym] = file
       end
       @filepaths.reject! { |k,v| v.count != 2 }
       return @filepaths
-    end
   end
 
   # Loop over the filepaths. Create a Key: title, Value: subtitles array.
@@ -247,17 +247,21 @@ class SubtitleDownloader
     end
   end
 
-  # two layerd hash. Hash with hash - values. results are pushed to the
+  # Two layerd hash. Hash with hash - values. Results are pushed to the
   # topics_counted hash accessed through the attr_accessor.
-  def sum_topic_values(hashy)
-    hashy.each do |title,v|
-      v.each do |key, value|
+  def sum_topic_values(multiple_video_hash)
+    raise ArgumentError, "Argument must be a Hash" unless multiple_video_hash.class == Hash
+    multiple_video_hash.each do |title,ten_key_hash|
+      ten_key_hash.each do |key, value|
+        # value[-1] is the last item which is always the rhash - topics.
         value[-1].each {|k,v| @topics_values_summed[title][k] += v.values.sum }
       end
     end
   end
 
+  # Create a topten counted word hash of each youtube video.
   def topten
+    return nil unless @subtitles.present?
     hashy = Hash.new {|h,k| h[k] = Hash.new }
     @subtitles.each {|k, subs| hashy[k] = remove_blacklisted_words_from(subs).count_and_hash.first(10).to_h }
     return hashy
@@ -328,7 +332,11 @@ downloader.download_subtitles
 # Create a hash of subtitle file paths.
 # Key: file name, Value: Hash - K:filetype V:fullpath
 file_path_hash = downloader.subtitles_file_path
-logger.info("Downloaded #{file_path_hash.keys.count} subtitles") if file_path_hash.present?
+if file_path_hash.present?
+  logger.info("Downloaded #{file_path_hash.keys.count} subtitles")
+else
+  logger.error("Exited because 0 files found in the dir: #{root_dir}") && exit
+end
 
 # Pass in the return value of the file_path_hash. This returns a hash.
 # Key: title, Value: Array of subtitle words.
