@@ -174,7 +174,7 @@ class SubtitleDownloader
   # Strip the filetype .json and .vtt and create a key, Add the file to the value.
   def subtitles_file_path
     subtitle_path = sub_dir(@root_dir)
-    return unless subtitle_path.present?
+    raise "FilePath found 0 files." unless subtitle_path.present?
       subtitle_path.each do |file|
         name = File.basename(file).split(/\./)[0]
         type = File.extname(file).split(/\./)[1]
@@ -248,7 +248,7 @@ class SubtitleDownloader
   end
 
   # Two layerd hash. Hash with hash - values. Results are pushed to the
-  # topics_counted hash accessed through the attr_accessor.
+  # topics_values_summed hash accessed through the attr_accessor.
   def sum_topic_values(multiple_video_hash)
     raise ArgumentError, "Argument must be a Hash" unless multiple_video_hash.class == Hash
     multiple_video_hash.each do |title,ten_key_hash|
@@ -261,22 +261,21 @@ class SubtitleDownloader
 
   # Create a topten counted word hash of each youtube video.
   def topten
-    return nil unless @subtitles.present?
+    raise "There are no Subtitles present" unless @subtitles.present?
     hashy = Hash.new {|h,k| h[k] = Hash.new }
     @subtitles.each {|k, subs| hashy[k] = remove_blacklisted_words_from(subs).count_and_hash.first(10).to_h }
     return hashy
   end
 
-  # args[0] title. args[1] value
+  # Loop over each youtube video title and its paragraphs.
   def build_database
     @added_paragraph_dataset.each do |k,para|
       file = @filepaths[k][:json]
-      top = topten
       data = JSON.parse(File.read(file))
       @logger.info("Creating: #{k} for User: #{data['uploader']}.")
       yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
       re = yt_user.youtube_results.find_or_create_by(title: data['title'])
-      re.update(duration: data['duration'], meta_data: {total: @topics_values_summed[k], topten: top[k]})
+      re.update(duration: data['duration'], meta_data: {total: @topics_values_summed[k], topten: topten[k]})
       re.subtitles.find_or_create_by(title:data['title'], paragraph:para)
     end
   end
@@ -332,11 +331,7 @@ downloader.download_subtitles
 # Create a hash of subtitle file paths.
 # Key: file name, Value: Hash - K:filetype V:fullpath
 file_path_hash = downloader.subtitles_file_path
-if file_path_hash.present?
-  logger.info("Downloaded #{file_path_hash.keys.count} subtitles")
-else
-  logger.error("Exited because 0 files found in the dir: #{root_dir}") && exit
-end
+logger.info("Downloaded #{file_path_hash.keys.count} subtitles") if file_path_hash.present?
 
 # Pass in the return value of the file_path_hash. This returns a hash.
 # Key: title, Value: Array of subtitle words.
