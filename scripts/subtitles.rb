@@ -4,7 +4,11 @@ require 'pry'
 require 'json'
 require 'logger'
 
-# TODO: add error handling. classes
+#TODO: how to group result topics without explicit naming.
+# posative and negative sentiment
+# mma, boxing,
+# visual, auditory, kinetic
+
 # {{{1 format
 #------------------------------------------------------------------------------
 def div
@@ -127,7 +131,7 @@ end
 
 class SubtitleDownloader
 
-  attr_accessor :paragraph, :topics_values_summed
+  attr_accessor :topics_values_summed, :paragraph
 
   include Logging
 
@@ -164,8 +168,11 @@ class SubtitleDownloader
     Chrome.where(:last_visit => date_range.days.ago..date_range.days.from_now).pluck(:url)
   end
 
-  # loop over each record downloading them to the ~/downloads/subs/*
+  # loop over the chrome_date_range method which takes one argument, how many
+  # day backward in chrome history to look for. loop over each record found
+  # downloading them to the ~/downloads/subs/*
   def download_subtitles
+    raise "There where no chrome records found to download" unless chrome_date_range(1).present?
     chrome_date_range(1).each {|url| begin; youtube_subtitles(url); rescue Exception => e; puts "#{e}";end }
   end
 
@@ -190,31 +197,33 @@ class SubtitleDownloader
     return @subtitles
   end
 
+  # results are @paragraph which uses it in a Setter attr_accessor :paragraph
   def create_paragraphs(downloaded_subs)
     raise ArgumentError, "argument must be a Hash" unless downloaded_subs.class == Hash
-    if downloaded_subs.present?
-      downloaded_subs.each do |key, sublist|
-        top_count_hash = remove_blacklisted_words_from(sublist).count_and_hash.first(10).to_h
-        top_count_hash.keys.each do |k|
-          # group_by groups all the words and there index's
-          # This creates a key and an array. The array contains all
-          # occurrence of the word and its index position.
-          subs = sublist.each_with_index.map {|w,i| [w,i] }.group_by {|i| i[0] }
+    raise "No subtitles are present." unless downloaded_subs.present?
+    downloaded_subs.each do |key, subtitle_array|
+      top_count_hash = remove_blacklisted_words_from(subtitle_array).count_and_hash.first(10).to_h
+      top_count_hash.keys.each do |k|
+        # Groups all the words and there index's
+        # This creates a key and an array. The array contains all
+        # occurrence of the word and its index position.
+        subs = subtitle_array.each_with_index.map {|w,i| [w,i] }.group_by {|i| i[0] }
 
-          # k is queried, if found it returns an array which is flattened. it is
-          # mapped returning only the integers which are the index positions of
-          # the words.
-          subs_ints = subs["#{k}"].flatten.map {|x| Integer(x) rescue nil }.compact
+        # k is queried, if found it returns an array which is flattened. it is
+        # mapped returning only the integers which are the index positions of
+        # the words.
+        subs_ints = subs["#{k}"].flatten.map {|x| Integer(x) rescue nil }.compact
 
-          # subs_ints is remapped permanently altering the array. First it creates a
-          # range of 50 words before and after i. Which is its index position. These
-          # are then joined into the paragraph.
-          subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; sublist[pre..pro].join(" ") }
-          subs_ints.each {|paragraph| (@paragraph[key][k]||[]) << paragraph }
-        end
+        # subs_ints is remapped permanently altering the array. First it creates a
+        # range of 50 words before and after i. Which is its index position. These
+        # are then joined into the paragraph.
+        subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; subtitle_array[pre..pro].join(" ") }
+        subs_ints.each {|paragraph| (@paragraph[key][k]||[]) << paragraph }
       end
     end
   end
+
+
 
   # Two layerd hash. Hash with hash - values. Results are pushed to the
   # topics_values_summed hash accessed through the attr_accessor.
@@ -296,6 +305,7 @@ unless Chrome.present? && Chrome.any?
 end
 #}}}
 # {{{1 create subtitles words array
+
 # create an instance of subtitles downloader.
 downloader = SubtitleDownloader.new
 
@@ -313,11 +323,14 @@ downloaded_subs = downloader.create_subtitles_array(file_path_hash)
 logger.info("Created #{downloaded_subs.count} subtitles words arrays.") if downloaded_subs.present?
 
 # }}}
-# {{{1 create paragraphs and topics
+# {{{1 create paragraphs
+
 # Create a hash
 # Key: video title, Value: value arrays. The values are the paragraphs.
 downloader.create_paragraphs(downloaded_subs)
 
+#}}}
+#{{{1 create paragraph topten and topic
 paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new {|h,k| h[k] = [] }}
 
 ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
@@ -346,13 +359,18 @@ downloader.paragraph.each do |title, ten_key_hash|
         # one word long.
         ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
 
-        # scan each paragraph string for the sentence.
-        ds.each {|sentence| rhash[dataset.underscore][sentence] = para.join.scan(/#{sentence}/).count if para.join.scan(/#{sentence}/).present? }
+        # join all paragraphs per key into a string and scan each string for the
+        # sentence.
+        ds.each do |sentence|
+          if para.join.scan(/#{sentence}/).present?
+            rhash[dataset.underscore.to_sym][sentence.to_sym] = para.join.scan(/#{sentence}/).count
+          end
+        end
 
+        # pass in the keys and pluck the word from the returned collection.
+        # then loop over each of the words creating the hash
+        # Key:dataset, SecondaryKey:found word, Value:occurrences of the word.
         if dataset.constantize.where(word: subs.keys).present?
-          # pass in the keys and pluck the word from the returned collection.
-          # then loop over each of the words creating the hash
-          # Key:dataset, SecondaryKey:found word, Value:occurrences of the word.
           found_words = dataset.constantize.where(word: subs.keys).pluck(:word)
           found_words.each {|word| rhash[dataset.underscore.to_sym][word.to_sym] = subs[word] }
         end
