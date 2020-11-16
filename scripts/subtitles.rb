@@ -3,6 +3,7 @@ require File.expand_path('../../config/environment', __FILE__)
 require 'pry'
 require 'json'
 require 'logger'
+require_relative 'youtube_history'
 
 #TODO: how to group result topics without explicit naming.
 # posative and negative sentiment
@@ -299,10 +300,51 @@ else
   exit
 end
 #}}}
-#{{{1 Chrome Entries
-unless Chrome.present? && Chrome.any?
-  @logger.error("DownloadSubtitlesError: Please check Chrome Model exists and contains records.")
+#{{{1 Chrome History
+
+# include the module youtube_history.
+include YoutubeHistory
+
+if Chrome.present?
+
+  # make a connection to the chrome db
+  connect_to_chrome
+
+  # create a instance of Url
+  youtube = Url.new
+
+  # create a hash of just the youtube results from the chrome history.
+  youtube_urls_hash = youtube.youtube_urls_hash
+
+  # re-establish_connection to rails db
+  connect_to_rails
+
+  # populate chrome model
+  unless youtube_urls_hash.empty?
+    youtube_urls_hash.each do |key, value|
+
+      # create or find the initial object based on title and url
+      youtube = Chrome.find_or_create_by(title: key, url: value[:url])
+      if youtube.last_visit == nil
+        youtube.update(visit_count: value[:visit_count] , last_visit: value[:last_visit])
+      # update the Chrome ActiveRecord if there last_visit has changed.
+      elsif youtube.last_visit < value[:last_visit]
+        youtube.update(visit_count: value[:visit_count] , last_visit: value[:last_visit])
+      end
+
+    end
+  end
+else
+  raise "Chrome model does not exist"
+  exit
 end
+
+# exit if there are no chrome records.
+unless Chrome.any?
+  @logger.error("DownloadSubtitlesError: Please check Chrome Model exists")
+  exit
+end
+
 #}}}
 # {{{1 create subtitles words array
 
