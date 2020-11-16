@@ -127,7 +127,7 @@ end
 
 class SubtitleDownloader
 
-  attr_accessor :paragraph, :added_paragraph_dataset, :topics_values_summed
+  attr_accessor :paragraph, :topics_values_summed
 
   include Logging
 
@@ -138,7 +138,6 @@ class SubtitleDownloader
     @paragraph = Hash.new {|h,k| h[k] = Hash.new {|hash, key| hash[key] = [] }}
     @added_paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
     @logger = logger_output(STDOUT)
-    @ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
     @root_dir = "/Users/shadowchaser/Downloads/Youtube_Subtitles/Subs"
   end
 
@@ -217,36 +216,6 @@ class SubtitleDownloader
     end
   end
 
-  # loop over the hash's 10 keys and paragraphs.
-  def paragraph_datasets(name, ten_key_hash)
-    raise ArgumentError, "Argument must be a Hash" unless ten_key_hash.class == Hash
-    raise ArgumentError, "Argument must be a String" unless name.class == String
-    if ten_key_hash.present?
-      ten_key_hash.each do |key, para|
-        rhash = nested_hash_default
-        subs = para.join.split.count_and_hash
-        load_models.each do |dataset|
-          unless @ignore_files.include?(dataset)
-            # pluck the word and keep it if the word splits in to more than one
-            # word as this represents a sentence.
-            ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
-            # scan each paragraph string for the sentence.
-            ds.each {|x| rhash[dataset.underscore][x] = para.join.scan(/#{x}/).count if para.join.scan(/#{x}/).present? }
-            if dataset.constantize.where(word: subs.keys).present?
-              found_words = dataset.constantize.where(word: subs.keys).pluck(:word)
-              found_words.each {|word| rhash[dataset.underscore.to_sym][word.to_sym] = subs[word] }
-            end
-          end
-        end
-        # create topten count of words. Add the paragraphs topten and topics.
-        # Flatten out the additional created array.
-        topten = remove_blacklisted_words_from(para.join.split).count_and_hash.first(10).to_h.symbolize_keys
-        (@added_paragraph_dataset[name][key]||[]) << [para,topten,rhash]
-        @added_paragraph_dataset[name].transform_values!(&:flatten)
-      end
-    end
-  end
-
   # Two layerd hash. Hash with hash - values. Results are pushed to the
   # topics_values_summed hash accessed through the attr_accessor.
   def sum_topic_values(multiple_video_hash)
@@ -268,11 +237,16 @@ class SubtitleDownloader
   end
 
   # Loop over each youtube video title and its paragraphs.
-  def build_database
-    @added_paragraph_dataset.each do |k,para|
+  def build_database(added_paragraph_dataset)
+    added_paragraph_dataset.each do |k,para|
+
+      # Key:title, NestedKey:filetype, Value: absolute path.
       file = @filepaths[k][:json]
+
+      # data is the video json file for the subtitles.
       data = JSON.parse(File.read(file))
       @logger.info("Creating: #{k} for User: #{data['uploader']}.")
+
       yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
       re = yt_user.youtube_results.find_or_create_by(title: data['title'])
       re.update(duration: data['duration'], meta_data: {total: @topics_values_summed[k], topten: topten[k]})
@@ -338,25 +312,77 @@ logger.info("Downloaded #{file_path_hash.keys.count} subtitles") if file_path_ha
 downloaded_subs = downloader.create_subtitles_array(file_path_hash)
 logger.info("Created #{downloaded_subs.count} subtitles words arrays.") if downloaded_subs.present?
 
-# Create a hash.
+# }}}
+# {{{1 create paragraphs and topics
+# Create a hash
 # Key: video title, Value: value arrays. The values are the paragraphs.
 downloader.create_paragraphs(downloaded_subs)
 
-# Setter Hash:
-# pass in the title and hash from paragraphs, which contains 10 keys.
-# This will create the dataset topic information and the topten counted words.
-downloader.paragraph.each {|k,h| downloader.paragraph_datasets(k,h) }
+paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new {|h,k| h[k] = [] }}
 
-# Setter Hash: paragraphs, datasets topics and topten from the paragraph_datasets
-topics_hash = downloader.added_paragraph_dataset
+ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
 
-# Sum each value of the nested hash array. returning topics_values_summed.
-downloader.sum_topic_values(topics_hash)
+# Setter: Hash
+# Loop over the title and ten_key_hash, each title represents a new youtube
+# video. The hash is ten keys and there corrisponding paragraphs.
+downloader.paragraph.each do |title, ten_key_hash|
+
+  # loop over the hash's 10 keys and paragraphs.
+  ten_key_hash.each do |key, para|
+
+    # create a hash each iteration round the loop.
+    rhash = nested_hash_default
+
+    # Subs joins all the paragraphs for each key and counts and hashes them.
+    # this is done so when it passes the subs.keys to the datasets they are
+    # only looking for each occurence of the word once. The value which is the
+    # count for its corrisponding key is later added back as rhash is built.
+    subs = para.join.split.count_and_hash
+
+    load_models.each do |dataset|
+      unless ignore_files.include?(dataset)
+
+        # pluck all words from the datasets, keeping only if they are more than
+        # one word long.
+        ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
+
+        # scan each paragraph string for the sentence.
+        ds.each {|sentence| rhash[dataset.underscore][sentence] = para.join.scan(/#{sentence}/).count if para.join.scan(/#{sentence}/).present? }
+
+        if dataset.constantize.where(word: subs.keys).present?
+          # pass in the keys and pluck the word from the returned collection.
+          # then loop over each of the words creating the hash
+          # Key:dataset, SecondaryKey:found word, Value:occurrences of the word.
+          found_words = dataset.constantize.where(word: subs.keys).pluck(:word)
+          found_words.each {|word| rhash[dataset.underscore.to_sym][word.to_sym] = subs[word] }
+        end
+      end
+    end
+
+    # create topten count of words. Add the paragraphs topten and topics.
+    # Flatten out the additional created array.
+    #topten = remove_blacklisted_words_from(para.join.split).count_and_hash.first(10).to_h.symbolize_keys
+    # re-add the topten
+    (paragraph_dataset[title][key]||[]) << [para,rhash]
+    paragraph_dataset[title].transform_values!(&:flatten)
+
+  end
+end
+
+#}}}
+#{{{1 sum topics
+
+# Sum each value of the nested hash array. returning @topics_values_summed.
+# This is used in the build_database method.
+downloader.sum_topic_values(paragraph_dataset)
+
+#}}}
+#{{{1 build database
 
 # build the datbase entries.
-downloader.build_database
+downloader.build_database(paragraph_dataset)
 
-# }}}
+#}}}
 # {{{1 total Users
 
 # Create a hash with a defualt value of 0
