@@ -80,6 +80,7 @@ class Url < ActiveRecord::Base
   end
 
 end
+
 #}}}
 #{{{1 main
 # create a instance of Url

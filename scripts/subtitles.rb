@@ -5,7 +5,6 @@ require 'json'
 require 'logger'
 
 # TODO: add error handling. classes
-# TODO: bring in the Class Total
 # {{{1 format
 #------------------------------------------------------------------------------
 def div
@@ -63,9 +62,8 @@ def syllable_count(word)
   word.scan(/[aeiouy]{1,2}/).size
 end
 
+# Counts each occurence of the word by the group_by method and hashes the result.
 class Array
-  # NOTE removing symbolize_keys
-  # Counts each occurence of the word by the group_by method and hashes the result.
   def count_and_hash
     self.group_by(&:itself).transform_values(&:count).sort_by{|k, v| v}.reverse.to_h
   end
@@ -135,12 +133,13 @@ class SubtitleDownloader
 
   def initialize
     @filepaths = Hash.new {|h,k| h[k] = Hash.new }
-    @subtitles = hash_nested_array
+    @subtitles = Hash.new
     @topics_values_summed = nested_hash_default
     @paragraph = Hash.new {|h,k| h[k] = Hash.new {|hash, key| hash[key] = [] }}
     @added_paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
     @logger = logger_output(STDOUT)
     @ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
+    @root_dir = "/Users/shadowchaser/Downloads/Youtube_Subtitles/Subs"
   end
 
   # Uses youtube-dl's auto sub generate downloader. downloads to ~/Downloads/Youtube
@@ -153,26 +152,27 @@ class SubtitleDownloader
       Dir.glob(directory_location + "/**/*").select{ |f| File.file? f }
   end
 
-  # check the existence of the model in the db and that there are any records.
-  # loop over each record downloading them to the ~/downloads/subs/*
-  def download_subtitles(date_range=1)
-    if Chrome.exists? && Chrome.any?
-      raise ArgumentError, "argument must be a Integer" unless date_range.class == Integer
-        chrome = Chrome.where(:last_visit => date_range.days.ago..date_range.days.from_now).pluck(:url)
-        @logger.info("Found #{chrome.count} chrome records for the period #{date_range.days.ago.strftime("%A, %d %b %Y ")} untill #{Time.now.strftime("%A, %d %b %Y ")}")
-        chrome.each {|url| begin; youtube_subtitles(url); rescue Exception => e; puts "#{e}";end }
-    else
-      @logger.error("DownloadSubtitlesError: Please check Chrome Model exists and contains records.")
-      exit
-    end
+  # Subtract the words returned from the Blacklist call from the words_array.
+  def remove_blacklisted_words_from(words_array)
+    raise ArgumentError, "Argument must be a Array" unless words_array.class == Array
+    (words_array - Blacklist.where(word: words_array).pluck(:word))
   end
 
-  # Create a filepath array subtitle_path. Loop over the file paths creating a
-  # hash. Remove the extension from the files to create a key and add each .json
-  # and .vtt to the keys value array, finally removing any keys that the values
-  # do not contain both of the .json and .vtt files for.
-  def subtitles_file_path(directory)
-    subtitle_path = sub_dir(directory)
+  # Pass in a date range of days to search backwards in the chrome history.
+  def chrome_date_range(date_range=1)
+    raise ArgumentError, "Argument must be a Integer" unless date_range.class == Integer
+    Chrome.where(:last_visit => date_range.days.ago..date_range.days.from_now).pluck(:url)
+  end
+
+  # loop over each record downloading them to the ~/downloads/subs/*
+  def download_subtitles
+    chrome_date_range(1).each {|url| begin; youtube_subtitles(url); rescue Exception => e; puts "#{e}";end }
+  end
+
+  # Create a filepath array. Remove the extension from the files to create a key
+  # Strip the filetype .json and .vtt and create a key, Add the file to the value.
+  def subtitles_file_path
+    subtitle_path = sub_dir(@root_dir)
     if subtitle_path.present?
       subtitle_path.each do |file|
         f = File.basename(file).split(/\./)[0]
@@ -181,27 +181,14 @@ class SubtitleDownloader
       end
       @filepaths.reject! { |k,v| v.count != 2 }
       return @filepaths
-    else
-      @logger.error("SubtitlesFilepathError: there are #{subtitle_path.count} files downloded")
-      exit
     end
   end
 
-  # Loop over the files finding the subtitles by there filetype .vtt
-  # create an array of subtitle words with this file and add the array to the
-  # hash using the original key. Then flatten the values array because it has
-  # an additional nested level that is unnecessary.
+  # Loop over the filepaths. Create a Key: title, Value: subtitles array.
   def create_subtitles_array(path_hash)
     raise ArgumentError, "argument must be a Hash" unless path_hash.class == Hash
-    path_hash.each do |key, file|
-      (@subtitles[key]||[]) << read_file(file[:vtt]) if file[:vtt]
-      @subtitles.transform_values! {|v| v.flatten } if file[:vtt]
-    end
+    path_hash.each {|key, file| @subtitles[key] = read_file(file[:vtt]) if file[:vtt] }
     return @subtitles
-  end
-
-  def remove_blacklisted_words_from(words_array)
-    (words_array - Blacklist.where(word: words_array).pluck(:word))
   end
 
   def create_paragraphs(downloaded_subs)
@@ -230,30 +217,33 @@ class SubtitleDownloader
     end
   end
 
-  # NOTE: name is not checked.
-  # NOTE: it doesnt check if the hash contains anything.
-  # loop over the hashy 10 keys and paragraphs.
-  def paragraph_datasets(name, hashy)
-    raise ArgumentError, "Argument must be a Hash" unless hashy.class == Hash
-    hashy.each do |key, para|
-      rhash = nested_hash_default
-      subs = para.join.split.count_and_hash
-      load_models.each do |dataset|
-        unless @ignore_files.include?(dataset)
-          ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
-          ds.each {|x| rhash[dataset.underscore][x] = para.join.scan(/#{x}/).count if para.join.scan(/#{x}/).present? }
-          if dataset.constantize.where(word: subs.keys).present?
-            found_words = dataset.constantize.where(word: subs.keys).pluck(:word)
-            found_words.each {|word| rhash[dataset.underscore.to_sym][word.to_sym] = subs[word] }
+  # loop over the hash's 10 keys and paragraphs.
+  def paragraph_datasets(name, ten_key_hash)
+    raise ArgumentError, "Argument must be a Hash" unless ten_key_hash.class == Hash
+    raise ArgumentError, "Argument must be a String" unless name.class == String
+    if ten_key_hash.present?
+      ten_key_hash.each do |key, para|
+        rhash = nested_hash_default
+        subs = para.join.split.count_and_hash
+        load_models.each do |dataset|
+          unless @ignore_files.include?(dataset)
+            # pluck the word and keep it if the word splits in to more than one
+            # word as this represents a sentence.
+            ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
+            # scan each paragraph string for the sentence.
+            ds.each {|x| rhash[dataset.underscore][x] = para.join.scan(/#{x}/).count if para.join.scan(/#{x}/).present? }
+            if dataset.constantize.where(word: subs.keys).present?
+              found_words = dataset.constantize.where(word: subs.keys).pluck(:word)
+              found_words.each {|word| rhash[dataset.underscore.to_sym][word.to_sym] = subs[word] }
+            end
           end
         end
+        # create topten count of words. Add the paragraphs topten and topics.
+        # Flatten out the additional created array.
+        topten = remove_blacklisted_words_from(para.join.split).count_and_hash.first(10).to_h.symbolize_keys
+        (@added_paragraph_dataset[name][key]||[]) << [para,topten,rhash]
+        @added_paragraph_dataset[name].transform_values!(&:flatten)
       end
-      # create topten count of words. Add the paragraphs topten and topics.
-      # Flatten out the additional created array.
-      topten = remove_blacklisted_words_from(para.join.split).count_and_hash.first(10).to_h.symbolize_keys
-      binding.pry
-      (@added_paragraph_dataset[name][key]||[]) << [para,topten,rhash]
-      @added_paragraph_dataset[name].transform_values!(&:flatten)
     end
   end
 
@@ -280,9 +270,6 @@ class SubtitleDownloader
       top = topten
       data = JSON.parse(File.read(file))
       @logger.info("Creating: #{k} for User: #{data['uploader']}.")
-
-      # NOTE: needs topten adding
-      # find the user and make the assosiation then update meta and duration.
       yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
       re = yt_user.youtube_results.find_or_create_by(title: data['title'])
       re.update(duration: data['duration'], meta_data: {total: @topics_values_summed[k], topten: top[k]})
@@ -326,16 +313,21 @@ else
   exit
 end
 #}}}
+#{{{1 Chrome Entries
+unless Chrome.present? && Chrome.any?
+  @logger.error("DownloadSubtitlesError: Please check Chrome Model exists and contains records.")
+end
+#}}}
 # {{{1 create subtitles words array
 # create an instance of subtitles downloader.
 downloader = SubtitleDownloader.new
 
-# Download the subtitles. Arg = Int. How many days backwards in the history.
-downloader.download_subtitles(1)
+# Download the subtitles.
+downloader.download_subtitles
 
 # Create a hash of subtitle file paths.
 # Key: file name, Value: Hash - K:filetype V:fullpath
-file_path_hash = downloader.subtitles_file_path(root_dir)
+file_path_hash = downloader.subtitles_file_path
 logger.info("Downloaded #{file_path_hash.keys.count} subtitles") if file_path_hash.present?
 
 # Pass in the return value of the file_path_hash. This returns a hash.
@@ -358,8 +350,35 @@ topics_hash = downloader.added_paragraph_dataset
 # Sum each value of the nested hash array. returning topics_values_summed.
 downloader.sum_topic_values(topics_hash)
 
-# Setter Hash: final hash with paragraphs topics and topten counted words.
-downloader.topics_values_summed
+# build the datbase entries.
 downloader.build_database
 
+# }}}
+# {{{1 total Users
+
+# Create a hash with a defualt value of 0
+result_hash = Hash.new {|h,k| h[k] = Hash.new(0) }
+
+# iterate over each User tallying the results of all the youtube_results.
+User.all.each do |item|
+
+  # reset the accumulated_duration so it can be rebuilt dependent on any
+  # changes to its size.
+  item[:accumulated_duration] = 0
+
+  # iterate over each assosiaction record belonging to the user.
+  item.youtube_results.each do |obj|
+
+    # retrive the json hash - :meta_data and iterate over each k,v pair adding
+    # the key and counting the value to the result hash.
+    obj[:meta_data]['total'].each {|k,v| result_hash["#{item[:uploader]}"][k] += v }
+
+    # accumulate each of the durations.
+    item[:accumulated_duration] += obj[:duration]
+  end
+
+  # add the count to the video_count attribute and update the last updated
+  # accumulated_duration attribute. Lastly re add the hash to accumulator.
+  item.update(video_count: item.youtube_results.count, accumulator_last_update: Time.now, accumulator: result_hash["#{item[:uploader]}"])
+end
 # }}}
