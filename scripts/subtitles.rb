@@ -5,7 +5,15 @@ require 'json'
 require 'logger'
 require_relative 'youtube_history'
 
-#TODO: how to group result topics without explicit naming.
+# TODO: top ten needs to go back.
+# TODO: denominations of the categories turned into percentages
+# TODO: support for safari.
+# TODO: access history.db while browser is open.
+# TODO: close browser if unable to find a way to run and access history.
+# TODO: logging.
+# TODO: how to group result topics without explicit naming.
+# TODO: add optinal words to the ten keys?
+# TODO: documentation
 # posative and negative sentiment
 # mma, boxing,
 # visual, auditory, kinetic
@@ -198,26 +206,23 @@ class SubtitleDownloader
     return @subtitles
   end
 
-  # results are @paragraph which uses it in a Setter attr_accessor :paragraph
+  # Hash the subtitles_array removing all blacklisted words. Take the top 10
+  # counted keys. Key:k, Loop over the keys.
+  # Loop over the subtitle_array making a tupal of the indices and the word then
+  # use the group_by specifying which index of the iterator to use to form the
+  # primary key of the grouped_by hash. Pass in the Key:k flatten and map
+  # only the integers.
+  # Paragraphs are formed using the indices in sub_ints each represent the
+  # position of the Key:k. 50 words are then found proceeding and proceeding
+  # the indices and joined in to a paragraph.
   def create_paragraphs(downloaded_subs)
     raise ArgumentError, "argument must be a Hash" unless downloaded_subs.class == Hash
     raise "No subtitles are present." unless downloaded_subs.present?
     downloaded_subs.each do |key, subtitle_array|
       top_count_hash = remove_blacklisted_words_from(subtitle_array).count_and_hash.first(10).to_h
       top_count_hash.keys.each do |k|
-        # Groups all the words and there index's
-        # This creates a key and an array. The array contains all
-        # occurrence of the word and its index position.
         subs = subtitle_array.each_with_index.map {|w,i| [w,i] }.group_by {|i| i[0] }
-
-        # k is queried, if found it returns an array which is flattened. it is
-        # mapped returning only the integers which are the index positions of
-        # the words.
-        subs_ints = subs["#{k}"].flatten.map {|x| Integer(x) rescue nil }.compact
-
-        # subs_ints is remapped permanently altering the array. First it creates a
-        # range of 50 words before and after i. Which is its index position. These
-        # are then joined into the paragraph.
+        subs_ints = subs[k].flatten.map {|x| Integer(x) rescue nil }.compact
         subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; subtitle_array[pre..pro].join(" ") }
         subs_ints.each {|paragraph| (@paragraph[key][k]||[]) << paragraph }
       end
@@ -300,7 +305,7 @@ else
   exit
 end
 #}}}
-#{{{1 Chrome History
+#{{{1 chrome History
 
 # include the module youtube_history.
 include YoutubeHistory
@@ -362,7 +367,6 @@ logger.info("Downloaded #{file_path_hash.keys.count} subtitles") if file_path_ha
 # Pass in the return value of the file_path_hash. This returns a hash.
 # Key: title, Value: Array of subtitle words.
 downloaded_subs = downloader.create_subtitles_array(file_path_hash)
-logger.info("Created #{downloaded_subs.count} subtitles words arrays.") if downloaded_subs.present?
 
 # }}}
 # {{{1 create paragraphs
@@ -390,8 +394,8 @@ downloader.paragraph.each do |title, ten_key_hash|
 
     # Subs joins all the paragraphs for each key and counts and hashes them.
     # this is done so when it passes the subs.keys to the datasets they are
-    # only looking for each occurence of the word once. The value which is the
-    # count for its corrisponding key is later added back as rhash is built.
+    # only looking for each occurrence of the word once. The value which is the
+    # count for its corresponding key is later added back as rhash is built.
     subs = para.join.split.count_and_hash
 
     load_models.each do |dataset|
@@ -427,6 +431,8 @@ downloader.paragraph.each do |title, ten_key_hash|
     paragraph_dataset[title].transform_values!(&:flatten)
 
   end
+  # not permanent
+  logger.info("created #{paragraph_dataset.keys}")
 end
 
 #}}}

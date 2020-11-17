@@ -20,3 +20,5 @@ have a counted topic score and a top ten words.
 
 Subtitles is an association to the YoutubeRecord. It contains ten keys each key
 is one of the topten words and has corresponding paragraphs.
+
+
