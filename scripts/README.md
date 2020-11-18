@@ -1,24 +1,31 @@
-# FILTER
+# Subtitles Downloader
 
-Schedule youtube downloads with the YoutubeDownloader. It will look up your
-browser history find all your youtube videos and download the subtitles for
-each video.
+The downloader uses Chrome to access your browsers history. It creates a entry for
+each youtube videos it finds then downloads the subtitles and json data.
 
-## User
-
-User will create a user based of the channel name. It will also have an
-accumulated score of all videos.
+## Class SubtitleDownloader
 
 
-## YoutubeResult
-
-YoutubeResult will create a assosiated record to user for each video. It will
-have a counted topic score and a top ten words.
+    downloader = SubtitleDownloader.new
 
 
-## Subtitles
+##### Download the subtitles
 
-Subtitles is an association to the YoutubeRecord. It contains ten keys each key
-is one of the topten words and has corresponding paragraphs.
 
+    downloader.download_subtitles
+
+
+##### Build the Subtitles
+
+
+    downloader.build_subtitles_hash
+
+
+##### Build the Paragraphs
+
+Build the Paragraphs takes an Argument how many paragraph keys you want created.
+All occurrences of the key will then be found, creating the paragraph's.
+
+
+    downloader.build_paragraphs(3)
 

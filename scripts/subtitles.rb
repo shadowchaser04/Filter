@@ -5,6 +5,7 @@ require 'json'
 require 'logger'
 require_relative 'youtube_history'
 
+# TODO: return vlues from methods.
 # TODO: top ten needs to go back.
 # TODO: denominations of the categories turned into percentages
 # TODO: support for safari.
@@ -215,11 +216,11 @@ class SubtitleDownloader
   # Paragraphs are formed using the indices in sub_ints each represent the
   # position of the Key:k. 50 words are then found proceeding and proceeding
   # the indices and joined in to a paragraph.
-  def create_paragraphs(downloaded_subs)
+  def create_paragraphs(downloaded_subs, int=10)
     raise ArgumentError, "argument must be a Hash" unless downloaded_subs.class == Hash
     raise "No subtitles are present." unless downloaded_subs.present?
     downloaded_subs.each do |key, subtitle_array|
-      top_count_hash = remove_blacklisted_words_from(subtitle_array).count_and_hash.first(10).to_h
+      top_count_hash = remove_blacklisted_words_from(subtitle_array).count_and_hash.first(int).to_h
       top_count_hash.keys.each do |k|
         subs = subtitle_array.each_with_index.map {|w,i| [w,i] }.group_by {|i| i[0] }
         subs_ints = subs[k].flatten.map {|x| Integer(x) rescue nil }.compact
@@ -229,7 +230,15 @@ class SubtitleDownloader
     end
   end
 
+  # create a Hash. Key: video title, Value: subtitles Array.
+  def build_subtitles_hash
+      create_subtitles_array(subtitles_file_path)
+  end
 
+  def build_paragraphs(int)
+    raise ArgumentError, "argument must be a Integer" unless int.class == Integer
+    create_paragraphs(build_subtitles_hash,int)
+  end
 
   # Two layerd hash. Hash with hash - values. Results are pushed to the
   # topics_values_summed hash accessed through the attr_accessor.
@@ -351,7 +360,9 @@ unless Chrome.any?
 end
 
 #}}}
-# {{{1 create subtitles words array
+# {{{1 create subtitle paragraphs
+paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new {|h,k| h[k] = [] }}
+ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
 
 # create an instance of subtitles downloader.
 downloader = SubtitleDownloader.new
@@ -359,29 +370,17 @@ downloader = SubtitleDownloader.new
 # Download the subtitles.
 downloader.download_subtitles
 
-# Create a hash of subtitle file paths.
-# Key: file name, Value: Hash - K:filetype V:fullpath
-file_path_hash = downloader.subtitles_file_path
-logger.info("Downloaded #{file_path_hash.keys.count} subtitles") if file_path_hash.present?
+# Build the Subtitles Hash. key: title of video. Value: subtitles Array.
+downloader.build_subtitles_hash
 
-# Pass in the return value of the file_path_hash. This returns a hash.
-# Key: title, Value: Array of subtitle words.
-downloaded_subs = downloader.create_subtitles_array(file_path_hash)
-
-# }}}
-# {{{1 create paragraphs
-
-# Create a hash
-# Key: video title, Value: value arrays. The values are the paragraphs.
-downloader.create_paragraphs(downloaded_subs)
+# Build the Paragraphs. Takes an Arg how many paragraph keys you want created.
+# All occurrences of the key will then be found, creating the paragraph's.
+# Key: video title, Value: value array. The values are the paragraphs.
+downloader.build_paragraphs(3)
 
 #}}}
-#{{{1 create paragraph topten and topic
-paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new {|h,k| h[k] = [] }}
-
-ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
-
-# Setter: Hash
+# {{{1 datasets
+# Setter created from build_paragraphs via attr_accessor :paragraphs
 # Loop over the title and ten_key_hash, each title represents a new youtube
 # video. The hash is ten keys and there corrisponding paragraphs.
 downloader.paragraph.each do |title, ten_key_hash|
@@ -431,8 +430,6 @@ downloader.paragraph.each do |title, ten_key_hash|
     paragraph_dataset[title].transform_values!(&:flatten)
 
   end
-  # not permanent
-  logger.info("created #{paragraph_dataset.keys}")
 end
 
 #}}}
