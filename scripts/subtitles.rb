@@ -165,7 +165,7 @@ class SubtitleDownloader
     Dir.glob(directory_location + "/**/*").select{ |f| File.file? f }
   end
 
-  # Subtract the words returned from the Blacklist call from the words_array.
+  # Subtract the words returned from the Blacklist words_array from the words array.
   def remove_blacklisted_words_from(words_array)
     raise ArgumentError, "Argument must be a Array" unless words_array.class == Array
     (words_array - Blacklist.where(word: words_array).pluck(:word))
