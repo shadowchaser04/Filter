@@ -1,7 +1,7 @@
 # Subtitles Downloader
 
 The downloader uses Chrome to access your browsers history. It creates a entry for
-each youtube videos it finds then downloads the subtitles and json data.
+each youtube video it finds then downloads the subtitles and json data.
 
 ## Class SubtitleDownloader
 
