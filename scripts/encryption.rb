@@ -39,7 +39,6 @@ end
 # the shift moves the ordinal position + and - @shift
 cypher = Encryption.new(10)
 
-binding.pry
 # create a key and encrypt
 mykey = cypher.encrypt("password")
 
