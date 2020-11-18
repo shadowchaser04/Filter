@@ -25,7 +25,7 @@ Download the subtitles takes an argument. An Integer. How many days back in your
 
 #### Build the Paragraphs
 
-Build the Paragraphs takes an Argument, how many paragraph keys you want created.
+Build the paragraphs takes an argument, how many paragraph keys you want created.
 All occurrences of the key will then be found, creating the paragraph's.
 
 
