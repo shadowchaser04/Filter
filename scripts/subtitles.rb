@@ -381,12 +381,12 @@ downloader.build_paragraphs(3)
 #}}}
 # {{{1 datasets
 # Setter created from build_paragraphs via attr_accessor :paragraphs
-# Loop over the title and ten_key_hash, each title represents a new youtube
+# Loop over the title and hash_keys, each title represents a new youtube
 # video. The hash is ten keys and there corrisponding paragraphs.
-downloader.paragraph.each do |title, ten_key_hash|
+downloader.paragraph.each do |title, hash_keys|
 
   # loop over the hash's 10 keys and paragraphs.
-  ten_key_hash.each do |key, para|
+  hash_keys.each do |key, para|
 
     # create a hash each iteration round the loop.
     rhash = nested_hash_default
