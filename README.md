@@ -9,19 +9,21 @@ each youtube video it finds then downloads the subtitles and json data.
     downloader = SubtitleDownloader.new
 
 
-##### Download the subtitles
+#### Download the subtitles
+
+Download the subtitles takes an argument. An Integer. How many days back in your chrome history.
 
 
-    downloader.download_subtitles
+    downloader.download_subtitles(2)
 
 
-##### Build the Subtitles
+#### Build the Subtitles
 
 
     downloader.build_subtitles_hash
 
 
-##### Build the Paragraphs
+#### Build the Paragraphs
 
 Build the Paragraphs takes an Argument, how many paragraph keys you want created.
 All occurrences of the key will then be found, creating the paragraph's.
