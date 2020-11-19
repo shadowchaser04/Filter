@@ -5,8 +5,7 @@ require 'json'
 require 'logger'
 require_relative 'youtube_history'
 
-# TODO: return vlues from methods.
-# TODO: top ten needs to go back.
+# TODO: while building the db. just paragraphs? topics? topen?
 # TODO: denominations of the categories turned into percentages
 # TODO: support for safari.
 # TODO: access history.db while browser is open.
@@ -192,7 +191,7 @@ class SubtitleDownloader
   # Strip the filetype .json and .vtt and create a key, Add the file to the value.
   def subtitles_file_path
     subtitle_path = sub_dir(@root_dir)
-    raise "FilePath found 0 files." unless subtitle_path.present?
+    if subtitle_path.present?
       subtitle_path.each do |file|
         name = File.basename(file).split(/\./)[0]
         type = File.extname(file).split(/\./)[1]
@@ -200,8 +199,12 @@ class SubtitleDownloader
       end
       @filepaths.reject! { |k,v| v.count != 2 }
       return @filepaths
+    else
+      @logger.error("There are #{subtitle_path.count} downloaded subtitles")
+    end
   end
 
+  #NOTE: will only look for subtitles.vtt to make subtitles_array.
   # Loop over the filepaths. Create a Key: title, Value: subtitles array.
   def create_subtitles_array(path_hash)
     raise ArgumentError, "argument must be a Hash" unless path_hash.class == Hash
@@ -220,7 +223,8 @@ class SubtitleDownloader
   # the indices and joined in to a paragraph.
   def create_paragraphs(downloaded_subs, int=10)
     raise ArgumentError, "argument must be a Hash" unless downloaded_subs.class == Hash
-    raise "No subtitles are present." unless downloaded_subs.present?
+    raise ArgumentError, "argument must be a Integer" unless downloaded_subs.class == Integer
+    #NOTE: present? has been removed.
     downloaded_subs.each do |key, subtitle_array|
       top_count_hash = remove_blacklisted_words_from(subtitle_array).count_and_hash.first(int).to_h
       top_count_hash.keys.each do |k|
@@ -243,7 +247,9 @@ class SubtitleDownloader
   end
 
 
+  # NOTE: needs commenting
   def create_dataset_sentences(paragraph)
+    raise "ArgumentError must be a Array" unless paragraph.class == Array
     subs = paragraph.join.split.count_and_hash
     sentence_hash = nested_hash_default
 
@@ -260,7 +266,9 @@ class SubtitleDownloader
     return sentence_hash
   end
 
+  # NOTE: needs commenting
   def create_dataset_words(paragraph)
+    raise "ArgumentError must be a Array" unless paragraph.class == Array
     subs = paragraph.join.split.count_and_hash
     words_hash = nested_hash_default
 
@@ -280,6 +288,8 @@ class SubtitleDownloader
   # video. The hash is ten keys and there corrisponding paragraphs.
   # loop over the hash's 10 keys and paragraphs.
   def build_paragraph_datasets(paragraphs_hash)
+    binding.pry
+    raise "ArgumentError must be a Hash" unless paragraphs_hash.present?
     paragraphs_hash.each do |title, hash_keys|
       hash_keys.each do |key, para|
 
@@ -315,9 +325,12 @@ class SubtitleDownloader
 
   # Create a topten counted word hash of each youtube video.
   def topten
-    raise "There are no Subtitles present" unless @subtitles.present?
-    hashy = Hash.new {|h,k| h[k] = Hash.new }
-    @subtitles.each {|k, subs| hashy[k] = remove_blacklisted_words_from(subs).count_and_hash.first(10).to_h }
+    if @subtitles.present?
+      hashy = Hash.new {|h,k| h[k] = Hash.new }
+      @subtitles.each {|k, subs| hashy[k] = remove_blacklisted_words_from(subs).count_and_hash.first(10).to_h }
+    else
+      @logger.error("Error: There are #{@subtitles.count} subtitles available in #{__method__}")
+    end
     return hashy
   end
 
@@ -422,8 +435,6 @@ end
 
 #}}}
 # {{{1 create subtitle paragraphs
-paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new {|h,k| h[k] = [] }}
-
 # create an instance of subtitles downloader.
 downloader = SubtitleDownloader.new
 
@@ -438,20 +449,11 @@ downloader.build_subtitles_hash
 # Key: video title, Value: value array. The values are the paragraphs.
 downloader.build_paragraphs(3)
 
-#}}}
-# {{{1 datasets
-
 # build the dataset information for the paragraphs.
 downloader.build_paragraph_datasets(downloader.paragraph)
 
-#}}}
-#{{{1 sum topics
-
 # paragraph_dataset is the returned setter hash from build_paragraph_datasets.
 downloader.sum_topic_values(downloader.paragraph_dataset)
-
-#}}}
-#{{{1 build database
 
 # build the datbase entries. paragraph_dataset is the returned setter hash from
 # build_paragraph_datasets.
