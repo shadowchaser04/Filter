@@ -5,6 +5,7 @@ require 'json'
 require 'logger'
 require_relative 'youtube_history'
 
+# TODO: make sure all keys are symbols and lowercased.
 # TODO: while building the db. just paragraphs? topics? topen?
 # TODO: denominations of the categories turned into percentages
 # TODO: support for safari.
@@ -96,9 +97,9 @@ end
 def read_file(arg)
   sanatised = []
   File.open(arg).each do |line|
-      line.gsub!(/<[^>]*>/, "")
-      line.gsub!(/(__)/, '')
-      sanatised << line.gsub(/([^\w\s]|([0-9]|\:|\.))/, "").downcase
+    line.gsub!(/<[^>]*>/, "")
+    line.gsub!(/(__)/, '')
+    sanatised << line.gsub(/([^\w\s]|([0-9]|\:|\.))/, "").downcase
   end
   # remove dup lines with uniq then clean up formatting.
   aa = sanatised.uniq.join.split(" ")
@@ -183,7 +184,7 @@ class SubtitleDownloader
   # downloading them to the ~/downloads/subs/*
   def download_subtitles(int)
     raise "There where no chrome records found to download" unless chrome_date_range(int).present?
-    raise "Argument must be a Integer" unless int.class == Integer
+    raise ArgumentError, "Argument must be a Integer" unless int.class == Integer
     chrome_date_range(int).each { |url| youtube_subtitles(url) }
   end
 
@@ -193,23 +194,32 @@ class SubtitleDownloader
     subtitle_path = sub_dir(@root_dir)
     if subtitle_path.present?
       subtitle_path.each do |file|
-        name = File.basename(file).split(/\./)[0]
-        type = File.extname(file).split(/\./)[1]
-        @filepaths[name][type.to_sym] = file
+        begin
+          name = File.basename(file).split(/\./)[0]
+          type = File.extname(file).split(/\./)[1]
+          @filepaths[name][type.to_sym] = file
+        rescue Exception => e
+          puts "#{__FILE__}:#{__LINE__}:in #{__method__}: #{e}"
+        end
       end
       @filepaths.reject! { |k,v| v.count != 2 }
+      raise "no files passes validation." unless @filepaths.present?
       return @filepaths
     else
-      @logger.error("There are #{subtitle_path.count} downloaded subtitles")
+      @logger.error("#{__FILE__}:#{__LINE__}:in #{__method__}: There are #{subtitle_path.count} downloaded subtitles")
     end
   end
 
-  #NOTE: will only look for subtitles.vtt to make subtitles_array.
   # Loop over the filepaths. Create a Key: title, Value: subtitles array.
   def create_subtitles_array(path_hash)
     raise ArgumentError, "argument must be a Hash" unless path_hash.class == Hash
     path_hash.each {|key, file| @subtitles[key] = read_file(file[:vtt]) if file[:vtt] }
     return @subtitles
+  end
+
+  # create a Hash. Key: video title, Value: subtitles Array.
+  def build_subtitles_hash
+      create_subtitles_array(subtitles_file_path)
   end
 
   # Hash the subtitles_array removing all blacklisted words. Take the top 10
@@ -223,8 +233,7 @@ class SubtitleDownloader
   # the indices and joined in to a paragraph.
   def create_paragraphs(downloaded_subs, int=10)
     raise ArgumentError, "argument must be a Hash" unless downloaded_subs.class == Hash
-    raise ArgumentError, "argument must be a Integer" unless downloaded_subs.class == Integer
-    #NOTE: present? has been removed.
+    raise ArgumentError, "argument must be a Integer" unless int.class == Integer
     downloaded_subs.each do |key, subtitle_array|
       top_count_hash = remove_blacklisted_words_from(subtitle_array).count_and_hash.first(int).to_h
       top_count_hash.keys.each do |k|
@@ -236,39 +245,50 @@ class SubtitleDownloader
     end
   end
 
-  # create a Hash. Key: video title, Value: subtitles Array.
-  def build_subtitles_hash
-      create_subtitles_array(subtitles_file_path)
-  end
-
   def build_paragraphs(int)
     raise ArgumentError, "argument must be a Integer" unless int.class == Integer
     create_paragraphs(build_subtitles_hash,int)
   end
 
-
-  # NOTE: needs commenting
+  # Pluck all the words from the model-dataset creating an array. Loop over the
+  # array keeping only the words that are able to be split into an array using
+  # split then are over the count of one. This rejects single words and keeps
+  # only sentences. Join all the paragraphs into one long string and scan the
+  # string for the sentence, returning each occurrence as an array.
+  # Lastly return the hash results.
   def create_dataset_sentences(paragraph)
-    raise "ArgumentError must be a Array" unless paragraph.class == Array
+    raise ArgumentError, "Argument must be a Array" unless paragraph.class == Array
     subs = paragraph.join.split.count_and_hash
     sentence_hash = nested_hash_default
 
     load_models.each do |dataset|
       unless @ignore_files.include?(dataset)
-        ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
-        ds.each do |sentence|
+        begin
+          ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
+          ds.each do |sentence|
           if paragraph.join.scan(/#{sentence}/).present?
             sentence_hash[dataset.underscore.to_sym][sentence.to_sym] = paragraph.join.scan(/#{sentence}/).count
           end
+        end
+        rescue Exception => error
+          raise "#{__FILE__}:#{__LINE__}:in #{__method__}: #{error}"
         end
       end
     end
     return sentence_hash
   end
 
-  # NOTE: needs commenting
+  # Pass in an array. Hash the array into a counted words hash and make an
+  # array of just the keys. This is so the word is only queried once on the
+  # call to the database. Pluck the words it finds. Lastly loop over the words
+  # using the model name as the primarily key and the word as the secondary key.
+  # The word is then searched for in the counted words hash returning its count
+  # value.
+  # NOTE: The subs.keys passed to the where searches all keys at once. Which is fast.
+  # NOTE: As the words have been counted. If found we know how many occurrences
+  # there are.
   def create_dataset_words(paragraph)
-    raise "ArgumentError must be a Array" unless paragraph.class == Array
+    raise ArgumentError, "Argument must be a Array" unless paragraph.class == Array
     subs = paragraph.join.split.count_and_hash
     words_hash = nested_hash_default
 
@@ -283,42 +303,31 @@ class SubtitleDownloader
     return words_hash
   end
 
-  # Setter created from build_paragraphs via attr_accessor :paragraphs
-  # Loop over the title and hash_keys, each title represents a new youtube
-  # video. The hash is ten keys and there corrisponding paragraphs.
-  # loop over the hash's 10 keys and paragraphs.
+  # Loop over the paragraphs_hash which is a youtube video title and hash of
+  # ten keys with corresponding paragraphs. Loop over the hash which produces
+  # a key and an array of paragraphs. Pass the paragraphs to the sentences and
+  # words then merge them into one hash. Create a count of the top ten words
+  # counted from the paragraphs. Add all to the paragraphs hash.
   def build_paragraph_datasets(paragraphs_hash)
-    binding.pry
-    raise "ArgumentError must be a Hash" unless paragraphs_hash.present?
+    raise ArgumentError, "Argument must be a Hash" unless paragraphs_hash.class == Hash
     paragraphs_hash.each do |title, hash_keys|
       hash_keys.each do |key, para|
-
-        # create sentence datasets.
         sentence = create_dataset_sentences(para)
-
-        # create words datasets.
         words = create_dataset_words(para)
-
-        # merge hashes (do it this way to not overwrite any keys)
         sentence.each {|k,v| words[k] = v }
-
-        # topten words from the paragraphs.
         topten = remove_blacklisted_words_from(para.join.split).count_and_hash.first(10).to_h.symbolize_keys
-
-        # re-add the topten
         @paragraph_dataset[title][key] = [para,topten,words]
       end
     end
   end
 
-  # Two layerd hash. Hash with hash - values. Results are pushed to the
-  # topics_values_summed hash accessed through the attr_accessor.
+  # Two layered hash. A hash with hash - values. Results are pushed to the
+  # topics_values_summed hash. Value[-1] is the last item which is always the topics hash.
   def sum_topic_values(multiple_video_hash)
     raise ArgumentError, "Argument must be a Hash" unless multiple_video_hash.class == Hash
     multiple_video_hash.each do |title,ten_key_hash|
       ten_key_hash.each do |key, value|
-        # value[-1] is the last item which is always the rhash - topics.
-        value[-1].each {|k,v| @topics_values_summed[title][k] += v.values.sum }
+        value[-1].each {|k,v| @topics_values_summed[title.to_sym][k] += v.values.sum }
       end
     end
   end
@@ -336,6 +345,7 @@ class SubtitleDownloader
 
   # Loop over each youtube video title and its paragraphs.
   def build_database(added_paragraph_dataset)
+    binding.pry
     added_paragraph_dataset.each do |k,para|
 
       # Key:title, NestedKey:filetype, Value: absolute path.
