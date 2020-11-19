@@ -9,7 +9,7 @@ each youtube video it finds then downloads the subtitles and json data.
     downloader = SubtitleDownloader.new
 ```
 
-#### Download the subtitles
+### Download the subtitles
 
 Download the subtitles takes an argument. An Integer. How many days back in your chrome history.
 
@@ -17,7 +17,7 @@ Download the subtitles takes an argument. An Integer. How many days back in your
     downloader.download_subtitles(2)
 
 
-#### Build the subtitles
+### Build the subtitles
 
 
     downloader.build_subtitles_hash
