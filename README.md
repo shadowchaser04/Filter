@@ -31,10 +31,24 @@ All occurrences of the key will then be found, creating the paragraph's.
 
     downloader.build_paragraphs(3)
 
+### Paragraph
+
+Paragraph is a setter method that gets created from `build paragraphs` 
+
 
 ### Build paragraph datasets
 
 Build the paragraph datasets, classifies each word based on topics and word
 classifiers.
+
+    
+    downloader.build_paragraph_datasets(downloader.paragraph)
+
+### Sum topics
+
+    
+    downloader.sum_topic_values(downloader.paragraph_dataset)
+
+### Build database
 
 
