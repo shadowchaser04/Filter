@@ -5,8 +5,6 @@ require 'json'
 require 'logger'
 require_relative 'youtube_history'
 
-# TODO: make sure all keys are symbols and lowercased.
-# TODO: while building the db. just paragraphs? topics? topen?
 # TODO: denominations of the categories turned into percentages
 # TODO: support for safari.
 # TODO: access history.db while browser is open.
@@ -156,7 +154,8 @@ class SubtitleDownloader
     @ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
   end
 
-  # Uses youtube-dl's auto sub generate downloader. downloads to ~/Downloads/Youtube
+  # Uses youtube-dl to download subtitles and json file to.
+  # ~/Downloads/Youtube/subs/
   def youtube_subtitles(address)
       system("youtube-dl --write-auto-sub --sub-format best --no-playlist --sub-lang en --skip-download --write-info-json \'#{address}\'")
   end
@@ -179,17 +178,26 @@ class SubtitleDownloader
     Chrome.where(:last_visit => date_range.days.ago..date_range.days.from_now).pluck(:url)
   end
 
-  # loop over the chrome_date_range method which takes one argument, how many
-  # day backward in chrome history to look for. loop over each record found
-  # downloading them to the ~/downloads/subs/*
+  # Here we're saving the returned value of the chrome_date_range method
+  # invocation in a variable called youtube_history. we loop over the variable
+  # passing each youtube url to the youtube_subtitles method downloading the
+  # json and vtt files to the ~/downloads/subs/*
+
   def download_subtitles(int)
-    raise "There where no chrome records found to download" unless chrome_date_range(int).present?
     raise ArgumentError, "Argument must be a Integer" unless int.class == Integer
-    chrome_date_range(int).each { |url| youtube_subtitles(url) }
+    raise "There where no chrome records found to download" unless chrome_date_range(int).present?
+    youtube_history = chrome_date_range(int)
+    youtube_history.each { |url| youtube_subtitles(url) }
   end
 
-  # Create a filepath array. Remove the extension from the files to create a key
-  # Strip the filetype .json and .vtt and create a key, Add the file to the value.
+  # Create a filepath array saving the returned value of the sub_dir method
+  # invocation in a variable called subtitle_path which is an Array. We then
+  # loop over the Array creating the String variable `name' which is the
+  # basename and the String variable `type' which is the extension type. (json,
+  # vtt). A hash is lastly created using the `name' variable to create a key
+  # and the `type' variable to create two nested keys, the values of which are
+  # the `file' block variable which is the absolute file path.
+
   def subtitles_file_path
     subtitle_path = sub_dir(@root_dir)
     if subtitle_path.present?
@@ -203,23 +211,33 @@ class SubtitleDownloader
         end
       end
       @filepaths.reject! { |k,v| v.count != 2 }
-      raise "no files passes validation." unless @filepaths.present?
+      raise "no files pass validation." unless @filepaths.present?
       return @filepaths
     else
       @logger.error("#{__FILE__}:#{__LINE__}:in #{__method__}: There are #{subtitle_path.count} downloaded subtitles")
     end
   end
 
-  # Loop over the filepaths. Create a Key: title, Value: subtitles array.
-  def create_subtitles_array(path_hash)
-    raise ArgumentError, "argument must be a Hash" unless path_hash.class == Hash
-    path_hash.each {|key, file| @subtitles[key] = read_file(file[:vtt]) if file[:vtt] }
+  # Loop over the filepaths hash creating two block variables `key' and
+  # `file_hash'. file_hash is a Hash that contains two keys (json, vtt).
+  # Create the subtitles_array by saving the returned value of the read_file
+  # method invocation in a variable called subtitles_array.
+  # Lastly create the @subtitles Hash using the title to create a key and the
+  # subtitles_array as the value.
+
+  def create_subtitles_array(filepaths_hash)
+    raise ArgumentError, "argument must be a Hash" unless filepaths_hash.class == Hash
+    filepaths_hash.each do |title, file_hash|
+      subtitles_array = read_file(file_hash[:vtt])
+      @subtitles[title] = subtitles_array
+    end
     return @subtitles
   end
 
   # create a Hash. Key: video title, Value: subtitles Array.
   def build_subtitles_hash
-      create_subtitles_array(subtitles_file_path)
+      subtitles = create_subtitles_array(subtitles_file_path)
+      return subtitles
   end
 
   # Hash the subtitles_array removing all blacklisted words. Take the top 10
@@ -231,6 +249,7 @@ class SubtitleDownloader
   # Paragraphs are formed using the indices in sub_ints each represent the
   # position of the Key:k. 50 words are then found proceeding and proceeding
   # the indices and joined in to a paragraph.
+
   def create_paragraphs(downloaded_subs, int=10)
     raise ArgumentError, "argument must be a Hash" unless downloaded_subs.class == Hash
     raise ArgumentError, "argument must be a Integer" unless int.class == Integer
@@ -245,9 +264,15 @@ class SubtitleDownloader
     end
   end
 
+  # The build_paragraphs method excepts an Integer argument. How many keys you
+  # want created. Present? checks if there is a return value present using the
+  # ternary operator which evaluates true or false. True: return paragraphs or
+  # False: raise an error.
+
   def build_paragraphs(int)
     raise ArgumentError, "argument must be a Integer" unless int.class == Integer
-    create_paragraphs(build_subtitles_hash,int)
+    paragraphs = create_paragraphs(build_subtitles_hash,int)
+    paragraphs.present? ? (return paragraphs) : (raise "#{__FILE__}:#{__LINE__}:in #{__method__}: unable to create paragraphs_hash")
   end
 
   # Pluck all the words from the model-dataset creating an array. Loop over the
@@ -256,6 +281,7 @@ class SubtitleDownloader
   # only sentences. Join all the paragraphs into one long string and scan the
   # string for the sentence, returning each occurrence as an array.
   # Lastly return the hash results.
+
   def create_dataset_sentences(paragraph)
     raise ArgumentError, "Argument must be a Array" unless paragraph.class == Array
     subs = paragraph.join.split.count_and_hash
@@ -284,9 +310,9 @@ class SubtitleDownloader
   # using the model name as the primarily key and the word as the secondary key.
   # The word is then searched for in the counted words hash returning its count
   # value.
-  # NOTE: The subs.keys passed to the where searches all keys at once. Which is fast.
-  # NOTE: As the words have been counted. If found we know how many occurrences
-  # there are.
+  # NOTE: The subs.keys passed to the where searches all keys at once which is fast
+  # as the words have been counted. If found we know how many occurrences there are.
+
   def create_dataset_words(paragraph)
     raise ArgumentError, "Argument must be a Array" unless paragraph.class == Array
     subs = paragraph.join.split.count_and_hash
@@ -304,10 +330,11 @@ class SubtitleDownloader
   end
 
   # Loop over the paragraphs_hash which is a youtube video title and hash of
-  # ten keys with corresponding paragraphs. Loop over the hash which produces
-  # a key and an array of paragraphs. Pass the paragraphs to the sentences and
-  # words then merge them into one hash. Create a count of the top ten words
-  # counted from the paragraphs. Add all to the paragraphs hash.
+  # keys with corresponding paragraphs. Loop over the hash which produces a key
+  # and an array of paragraphs. Pass the paragraphs to the sentences and words
+  # then merge them into one hash. Create a count of the top ten words counted
+  # from the paragraphs. Add all to the paragraphs hash.
+
   def build_paragraph_datasets(paragraphs_hash)
     raise ArgumentError, "Argument must be a Hash" unless paragraphs_hash.class == Hash
     paragraphs_hash.each do |title, hash_keys|
@@ -323,6 +350,7 @@ class SubtitleDownloader
 
   # Two layered hash. A hash with hash - values. Results are pushed to the
   # topics_values_summed hash. Value[-1] is the last item which is always the topics hash.
+
   def sum_topic_values(multiple_video_hash)
     raise ArgumentError, "Argument must be a Hash" unless multiple_video_hash.class == Hash
     multiple_video_hash.each do |title,ten_key_hash|
@@ -333,6 +361,7 @@ class SubtitleDownloader
   end
 
   # Create a topten counted word hash of each youtube video.
+
   def topten
     if @subtitles.present?
       hashy = Hash.new {|h,k| h[k] = Hash.new }
@@ -344,8 +373,8 @@ class SubtitleDownloader
   end
 
   # Loop over each youtube video title and its paragraphs.
+
   def build_database(added_paragraph_dataset)
-    binding.pry
     added_paragraph_dataset.each do |k,para|
 
       # Key:title, NestedKey:filetype, Value: absolute path.
@@ -445,6 +474,7 @@ end
 
 #}}}
 # {{{1 create subtitle paragraphs
+
 # create an instance of subtitles downloader.
 downloader = SubtitleDownloader.new
 

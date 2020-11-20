@@ -35,7 +35,6 @@ class Encryption
 
 end
 
-binding.pry
 # create an instance of encryption and set the shift
 # the shift moves the ordinal position + and - @shift
 cypher = Encryption.new(10)
@@ -43,7 +42,6 @@ cypher = Encryption.new(10)
 # create a key and encrypt
 mykey = cypher.encrypt("password")
 
-binding.pry
 # un-encrypt
 cypher.unencrypt(mykey)
 
