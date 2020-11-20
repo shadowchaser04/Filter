@@ -5,17 +5,15 @@ require 'json'
 require 'logger'
 require_relative 'youtube_history'
 
-# TODO: denominations of the categories turned into percentages
-# TODO: support for safari.
-# TODO: access history.db while browser is open.
-# TODO: close browser if unable to find a way to run and access history.
-# TODO: logging.
-# TODO: how to group result topics without explicit naming.
-# TODO: add optinal words to the ten keys?
-# TODO: documentation
-# posative and negative sentiment
-# mma, boxing,
-# visual, auditory, kinetic
+# TODO: Close chrome browser
+# TODO: Denominations of the categories turned into percentages
+# TODO: Support for safari.
+# TODO: Access history.db while browser is open.
+# TODO: Logging.
+# TODO: How to group result topics without explicit naming.
+# TODO: Add optinal words to the ten keys?
+# TODO: Documentation
+
 # {{{1 format
 #------------------------------------------------------------------------------
 def div
@@ -142,7 +140,7 @@ class SubtitleDownloader
 
   include Logging
 
-  def initialize
+  def initialize(root)
     @filepaths = Hash.new {|h,k| h[k] = Hash.new }
     @paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new }
     @subtitles = Hash.new
@@ -150,7 +148,7 @@ class SubtitleDownloader
     @paragraph = Hash.new {|h,k| h[k] = Hash.new {|hash, key| hash[key] = [] }}
     @added_paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
     @logger = logger_output(STDOUT)
-    @root_dir = "/Users/shadowchaser/Downloads/Youtube_Subtitles/Subs"
+    @root_dir = root
     @ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
   end
 
@@ -396,30 +394,35 @@ end
 #}}}
 # {{{1 test connection
 #------------------------------------------------------------------------------
+
+# The method Database_exists? Exits unless it is true that it exists.
 log_to_logfile.error("Program Close: Database does not exist.") unless database_exists?
 exit unless database_exists?
 
-# test whether then db returns true or false on the user or kicks an error.
-# if not this will exit the program.
+# Test whether the db has a User Model. If not it will exit the program.
 has_db_been_populated
+
 # }}}
 # {{{1 remove old directories
 #------------------------------------------------------------------------------
-# root directory
+
+# Root directory.
 root_dir = "/Users/shadowchaser/Downloads/Youtube_Subtitles/Subs"
 
-# remove the directory so its empty
+# Remove the directory so its empty.
 FileUtils.remove_dir(root_dir) if Dir.exist?(root_dir)
 logger.info("removed #{root_dir}") if !Dir.exist?(root_dir)
 
-# remake the directory so its empty
+# Remake the directory so its empty.
 FileUtils.mkdir(root_dir) if !Dir.exist?(root_dir)
 logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 
 # }}}
 #{{{1 load datasets
-# Eager loads the rails models. If datasets are not present exit and log
+
+# Eager loads the rails models. If datasets are not present exit and log,
 # otherwise print the count to screen.
+
 if load_models.present?
   logger.info("found #{load_models.count} datasets")
 else
@@ -434,27 +437,27 @@ include YoutubeHistory
 
 if Chrome.present?
 
-  # make a connection to the chrome db
+  # Make a connection to the chrome db
   connect_to_chrome
 
-  # create a instance of Url
+  # Create a instance of Url.
   youtube = Url.new
 
-  # create a hash of just the youtube results from the chrome history.
+  # Create a hash of the youtube results from the chrome history.
   youtube_urls_hash = youtube.youtube_urls_hash
 
-  # re-establish_connection to rails db
+  # Re-establish_connection to rails db.
   connect_to_rails
 
-  # populate chrome model
+  # Populate chrome model.
   unless youtube_urls_hash.empty?
     youtube_urls_hash.each do |key, value|
 
-      # create or find the initial object based on title and url
+      # Create or find the initial object based on title and url.
       youtube = Chrome.find_or_create_by(title: key, url: value[:url])
       if youtube.last_visit == nil
         youtube.update(visit_count: value[:visit_count] , last_visit: value[:last_visit])
-      # update the Chrome ActiveRecord if there last_visit has changed.
+      # Update the Chrome ActiveRecord if the last_visit has changed.
       elsif youtube.last_visit < value[:last_visit]
         youtube.update(visit_count: value[:visit_count] , last_visit: value[:last_visit])
       end
@@ -466,7 +469,7 @@ else
   exit
 end
 
-# exit if there are no chrome records.
+# Exit if there are no chrome records.
 unless Chrome.any?
   @logger.error("DownloadSubtitlesError: Please check Chrome Model exists")
   exit
@@ -475,27 +478,33 @@ end
 #}}}
 # {{{1 create subtitle paragraphs
 
-# create an instance of subtitles downloader.
-downloader = SubtitleDownloader.new
+# Environment variable.
+home = ENV['HOME']
+
+# Pass in the default youtube-dl downloads directory.
+downloads = File.join(home, "Downloads/Youtube_Subtitles/Subs")
+
+# Create an instance of subtitles downloader.
+downloader = SubtitleDownloader.new(downloads)
 
 # Download the subtitles providing an argument how many days ago.
 downloader.download_subtitles(1)
 
-# Build the Subtitles Hash. key: title of video. Value: subtitles Array.
+# Build the subtitles Hash. Key: title of video. Value: subtitles Array.
 downloader.build_subtitles_hash
 
-# Build the Paragraphs. Takes an Arg how many paragraph keys you want created.
+# Build the paragraphs takes an Arg, how many paragraph keys you want created.
 # All occurrences of the key will then be found, creating the paragraph's.
 # Key: video title, Value: value array. The values are the paragraphs.
 downloader.build_paragraphs(3)
 
-# build the dataset information for the paragraphs.
+# Build the dataset information for the paragraphs.
 downloader.build_paragraph_datasets(downloader.paragraph)
 
-# paragraph_dataset is the returned setter hash from build_paragraph_datasets.
+# Paragraph_dataset is the returned setter hash from build_paragraph_datasets.
 downloader.sum_topic_values(downloader.paragraph_dataset)
 
-# build the datbase entries. paragraph_dataset is the returned setter hash from
+# Build the database entries. Paragraph_dataset is the returned setter hash from
 # build_paragraph_datasets.
 downloader.build_database(downloader.paragraph_dataset)
 
