@@ -72,8 +72,8 @@ module YoutubeHistory
     def schema
       begin
         ActiveRecord::SchemaDumper.dump
-      rescue Exception => e
-        puts "#{e}"
+      rescue Exception => error
+        puts "#{error}"
       end
     end
 
