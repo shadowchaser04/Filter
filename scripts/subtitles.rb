@@ -14,12 +14,11 @@ require_relative 'youtube_history'
 # TODO: Add optinal words to the ten keys?
 # TODO: Documentation
 
+binding.pry
+
+
 # {{{1 format
 #------------------------------------------------------------------------------
-def div
-  puts "-"*50
-end
-
 def blue(color)
   "\e[34m#{color}\e[0m"
 end
@@ -63,14 +62,6 @@ else
   true
 end
 
-def syllable_count(word)
-  word.downcase!
-  return 1 if word.length <= 3
-  word.sub!(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '')
-  word.sub!(/^y/, '')
-  word.scan(/[aeiouy]{1,2}/).size
-end
-
 # Counts each occurence of the word by the group_by method and hashes the result.
 class Array
   def count_and_hash
@@ -107,11 +98,8 @@ end
 def has_db_been_populated
   begin
     User.all.present?
-  rescue ActiveRecord::StatementInvalid => e
-    puts "#{e}"
-    puts "Check the datbase has been created by running. Rake subtitle:full_build"
-    log_to_logfile.error("Program Closed: Database does not exist.")
-    exit
+  rescue ActiveRecord::StatementInvalid => error
+    raise "#{__FILE__}:#{__LINE__}:in #{__method__}: #{error}"
   end
 end
 
