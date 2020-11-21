@@ -14,9 +14,6 @@ require_relative 'youtube_history'
 # TODO: Add optinal words to the ten keys?
 # TODO: Documentation
 
-binding.pry
-
-
 # {{{1 format
 #------------------------------------------------------------------------------
 def blue(color)
@@ -94,14 +91,12 @@ def read_file(arg)
   aa.reject { |item| item.nil? || item == '  ' || item == ' ' || item == '\n' || item == ' \n' }
 end
 
+# NOTE: problem with any attempt to deal with this.
 # test whether then db returns true or false on the user or kicks an error.
 def has_db_been_populated
-  begin
-    User.all.present?
-  rescue ActiveRecord::StatementInvalid => error
-    raise "#{__FILE__}:#{__LINE__}:in #{__method__}: #{error}"
-  end
+  User.all.exists?
 end
+binding.pry
 
 # eager load the models keep it outside the loop so its only called once.
 # For Rails5 models are now subclasses of ApplicationRecord so to get the list
