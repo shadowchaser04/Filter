@@ -20,8 +20,8 @@ your history do you want to retrieve.
 
 #### return value: filepaths
 
-Filepaths is an `setter method Hash` consisting of a primary Key: title. And
-secondary nested keys json, and vtt. Each of which point to there absolute file
+Filepaths is an `setter method Hash` consisting of a primary Key: title and
+secondary nested keys `json`, and `vtt`. Each of which point to there absolute file
 path location.
 
 
