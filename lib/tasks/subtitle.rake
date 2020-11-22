@@ -53,7 +53,7 @@ namespace :subtitle do
 
   desc "create the result model"
   task result: :environment do
-    sh "rails g model YoutubeResult title:string duration:integer meta_data:json user:references --no-timestamps"
+    sh "rails g model YoutubeResult title:string duration:integer total:json topten:json user:references --no-timestamps"
   end
 
   desc "build full filter app"

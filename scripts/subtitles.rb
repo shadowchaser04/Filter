@@ -364,7 +364,7 @@ def create_subtitles(filepaths_hash)
 
       yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
       re = yt_user.youtube_results.find_or_create_by(title: data['title'])
-      re.update(duration: data['duration'], meta_data: {total: topic[title], topten: topten[title]})
+      re.update(duration: data['duration'], total:{topic[title]}, topten:{topten[title]})
       binding.pry
       re.subtitles.find_or_create_by(title:data['title'], paragraph:para)
     end
