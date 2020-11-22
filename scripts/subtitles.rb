@@ -96,7 +96,6 @@ end
 def has_db_been_populated
   User.all.exists?
 end
-binding.pry
 
 # eager load the models keep it outside the loop so its only called once.
 # For Rails5 models are now subclasses of ApplicationRecord so to get the list
@@ -104,6 +103,10 @@ binding.pry
 def load_models
   Rails.application.eager_load!
   return ApplicationRecord.descendants.collect { |type| type.name }
+end
+
+private def nested_hash
+    Hash.new {|h,k| h[k] = Hash.new }
 end
 
 private def nested_hash_default
@@ -119,26 +122,28 @@ end
 
 class SubtitleDownloader
 
-  attr_accessor :topics_values_summed, :paragraph, :paragraph_dataset
+  attr_accessor :filepaths, :subtitles, :paragraphs, :topic_values, :paragraph_datasets, :summed_topic_values, :summed_topten
 
   include Logging
 
   def initialize(root)
-    @filepaths = Hash.new {|h,k| h[k] = Hash.new }
-    @paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new }
+    @root_dir = root
+    @filepaths = nested_hash
     @subtitles = Hash.new
-    @topics_values_summed = nested_hash_default
-    @paragraph = Hash.new {|h,k| h[k] = Hash.new {|hash, key| hash[key] = [] }}
+    @paragraphs = Hash.new {|h,k| h[k] = Hash.new {|hash, key| hash[key] = [] }}
+    @summed_topic_values = nested_hash_default
+    @summed_topten = nested_hash
+
+    @paragraph_datasets = nested_hash
     @added_paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
     @logger = logger_output(STDOUT)
-    @root_dir = root
     @ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
   end
 
   # Uses youtube-dl to download subtitles and json file to.
   # ~/Downloads/Youtube/subs/
   def youtube_subtitles(address)
-      system("youtube-dl --write-auto-sub --sub-format best --no-playlist --sub-lang en --skip-download --write-info-json \'#{address}\'")
+      system("youtube-dl --skip-download --write-auto-sub --sub-format best --no-playlist --sub-lang en  --write-info-json \'#{address}\'")
   end
 
   # Creates and array of absolute filepaths.
@@ -168,6 +173,7 @@ class SubtitleDownloader
     raise ArgumentError, "Argument must be a Integer" unless int.class == Integer
     raise "There where no chrome records found to download" unless chrome_date_range(int).present?
     youtube_history = chrome_date_range(int)
+    @logger.info("found #{youtube_history.count } youtube url(s) for days between #{int.days.ago.strftime("%A, %d %b %Y")} and #{Date.today.strftime("%A, %d %b %Y")}")
     youtube_history.each { |url| youtube_subtitles(url) }
   end
 
@@ -179,21 +185,22 @@ class SubtitleDownloader
   # and the `type' variable to create two nested keys, the values of which are
   # the `file' block variable which is the absolute file path.
 
-  def subtitles_file_path
+  def filepaths
     subtitle_path = sub_dir(@root_dir)
     if subtitle_path.present?
       subtitle_path.each do |file|
         begin
           name = File.basename(file).split(/\./)[0]
           type = File.extname(file).split(/\./)[1]
-          @filepaths[name][type.to_sym] = file
+          @filepaths[name][type] = file
         rescue Exception => e
           puts "#{__FILE__}:#{__LINE__}:in #{__method__}: #{e}"
         end
       end
       @filepaths.reject! { |k,v| v.count != 2 }
       raise "no files pass validation." unless @filepaths.present?
-      return @filepaths
+      filepaths = @filepaths.deep_symbolize_keys
+      return filepaths
     else
       @logger.error("#{__FILE__}:#{__LINE__}:in #{__method__}: There are #{subtitle_path.count} downloaded subtitles")
     end
@@ -205,20 +212,13 @@ class SubtitleDownloader
   # method invocation in a variable called subtitles_array.
   # Lastly create the @subtitles Hash using the title to create a key and the
   # subtitles_array as the value.
-
-  def create_subtitles_array(filepaths_hash)
+def create_subtitles(filepaths_hash)
     raise ArgumentError, "argument must be a Hash" unless filepaths_hash.class == Hash
     filepaths_hash.each do |title, file_hash|
       subtitles_array = read_file(file_hash[:vtt])
       @subtitles[title] = subtitles_array
     end
     return @subtitles
-  end
-
-  # create a Hash. Key: video title, Value: subtitles Array.
-  def build_subtitles_hash
-      subtitles = create_subtitles_array(subtitles_file_path)
-      return subtitles
   end
 
   # Hash the subtitles_array removing all blacklisted words. Take the top 10
@@ -240,20 +240,9 @@ class SubtitleDownloader
         subs = subtitle_array.each_with_index.map {|w,i| [w,i] }.group_by {|i| i[0] }
         subs_ints = subs[k].flatten.map {|x| Integer(x) rescue nil }.compact
         subs_ints.map! {|i| pre = i - 50; pro = i + 50; pre = i if pre < 0; subtitle_array[pre..pro].join(" ") }
-        subs_ints.each {|paragraph| (@paragraph[key][k]||[]) << paragraph }
+        subs_ints.each {|paragraph| (@paragraphs[key][k]||[]) << paragraph }
       end
     end
-  end
-
-  # The build_paragraphs method excepts an Integer argument. How many keys you
-  # want created. Present? checks if there is a return value present using the
-  # ternary operator which evaluates true or false. True: return paragraphs or
-  # False: raise an error.
-
-  def build_paragraphs(int)
-    raise ArgumentError, "argument must be a Integer" unless int.class == Integer
-    paragraphs = create_paragraphs(build_subtitles_hash,int)
-    paragraphs.present? ? (return paragraphs) : (raise "#{__FILE__}:#{__LINE__}:in #{__method__}: unable to create paragraphs_hash")
   end
 
   # Pluck all the words from the model-dataset creating an array. Loop over the
@@ -274,7 +263,7 @@ class SubtitleDownloader
           ds = dataset.constantize.pluck(:word).keep_if {|x| x.split.count > 1 }
           ds.each do |sentence|
           if paragraph.join.scan(/#{sentence}/).present?
-            sentence_hash[dataset.underscore.to_sym][sentence.to_sym] = paragraph.join.scan(/#{sentence}/).count
+            sentence_hash[dataset.underscore][sentence] = paragraph.join.scan(/#{sentence}/).count
           end
         end
         rescue Exception => error
@@ -303,7 +292,7 @@ class SubtitleDownloader
       unless @ignore_files.include?(dataset)
         if dataset.constantize.where(word: subs.keys).present?
           found_words = dataset.constantize.where(word: subs.keys).pluck(:word)
-          found_words.each {|word| words_hash[dataset.underscore.to_sym][word.to_sym] = subs[word] }
+          found_words.each {|word| words_hash[dataset.underscore][word] = subs[word] }
         end
       end
     end
@@ -315,6 +304,7 @@ class SubtitleDownloader
   # and an array of paragraphs. Pass the paragraphs to the sentences and words
   # then merge them into one hash. Create a count of the top ten words counted
   # from the paragraphs. Add all to the paragraphs hash.
+  # NOTE: from this point all keys are symbolized
 
   def build_paragraph_datasets(paragraphs_hash)
     raise ArgumentError, "Argument must be a Hash" unless paragraphs_hash.class == Hash
@@ -323,8 +313,8 @@ class SubtitleDownloader
         sentence = create_dataset_sentences(para)
         words = create_dataset_words(para)
         sentence.each {|k,v| words[k] = v }
-        topten = remove_blacklisted_words_from(para.join.split).count_and_hash.first(10).to_h.symbolize_keys
-        @paragraph_dataset[title][key] = [para,topten,words]
+        topten = remove_blacklisted_words_from(para.join.split).count_and_hash.first(10).to_h
+        @paragraph_datasets[title.to_sym][key.to_sym] = {paragraphs: para,topten: topten.deep_symbolize_keys,sentiment:words.deep_symbolize_keys}
       end
     end
   end
@@ -336,30 +326,37 @@ class SubtitleDownloader
     raise ArgumentError, "Argument must be a Hash" unless multiple_video_hash.class == Hash
     multiple_video_hash.each do |title,ten_key_hash|
       ten_key_hash.each do |key, value|
-        value[-1].each {|k,v| @topics_values_summed[title.to_sym][k] += v.values.sum }
+        value[:sentiment].each { |k,v| @summed_topic_values[title][k] += v.values.sum }
       end
     end
   end
 
   # Create a topten counted word hash of each youtube video.
 
-  def topten
-    if @subtitles.present?
-      hashy = Hash.new {|h,k| h[k] = Hash.new }
-      @subtitles.each {|k, subs| hashy[k] = remove_blacklisted_words_from(subs).count_and_hash.first(10).to_h }
+  def sum_topten_titles(hash)
+    raise ArgumentError, "Argument must be a Hash" unless hash.class == Hash
+    if hash.present?
+      hash.each { |k, subs| @summed_topten[k] = remove_blacklisted_words_from(subs).count_and_hash.first(10).to_h }
     else
-      @logger.error("Error: There are #{@subtitles.count} subtitles available in #{__method__}")
+      @logger.error("Error: There are #{hash.count} subtitles available in #{__method__}")
     end
-    return hashy
   end
 
-  # Loop over each youtube video title and its paragraphs.
+  # Loop over each youtube video title and its paragraphs. Uses the
+  # topten_per_title method to create a topten count per video title.
 
-  def build_database(added_paragraph_dataset)
+  def build_database(added_paragraph_dataset, filepaths)
     added_paragraph_dataset.each do |k,para|
 
+      # convert the title to a symbol
+      title = k.to_sym
+
+      # Topic values is the setter created by sum_topic_values.
+      topic = summed_topic_values.deep_symbolize_keys
+      topten = summed_topten.deep_symbolize_keys
+
       # Key:title, NestedKey:filetype, Value: absolute path.
-      file = @filepaths[k][:json]
+      file = filepaths[k][:json]
 
       # data is the video json file for the subtitles.
       data = JSON.parse(File.read(file))
@@ -367,8 +364,30 @@ class SubtitleDownloader
 
       yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
       re = yt_user.youtube_results.find_or_create_by(title: data['title'])
-      re.update(duration: data['duration'], meta_data: {total: @topics_values_summed[k], topten: topten[k]})
+      re.update(duration: data['duration'], meta_data: {total: topic[title], topten: topten[title]})
+      binding.pry
       re.subtitles.find_or_create_by(title:data['title'], paragraph:para)
+    end
+  end
+
+  # Create a hash with a defualt value of 0. Iterate over each model User
+  # tallying the youtube_results. reset the accumulated_duration so it can be
+  # rebuilt dependent on any changes to its size. iterate over each assosiaction
+  # record belonging to the user. retrive the json hash - :meta_data and iterate
+  # over each k,v pair adding the key and counting the value to the result hash.
+  # accumulate each of the durations. add the count to the video_count attribute
+  # and update the last updated accumulated_duration attribute. Lastly re add the
+  # hash to accumulator.
+
+  def total_users
+    result_hash = Hash.new { |h,k| h[k] = Hash.new(0) }
+    User.all.each do |item|
+      item[:accumulated_duration] = 0
+      item.youtube_results.each do |obj|
+        obj[:meta_data]['total'].each {|k,v| result_hash["#{item[:uploader]}"][k] += v }
+        item[:accumulated_duration] += obj[:duration]
+      end
+      item.update(video_count: item.youtube_results.count, accumulator_last_update: Time.now, accumulator: result_hash["#{item[:uploader]}"])
     end
   end
 
@@ -471,52 +490,30 @@ downloads = File.join(home, "Downloads/Youtube_Subtitles/Subs")
 downloader = SubtitleDownloader.new(downloads)
 
 # Download the subtitles providing an argument how many days ago.
+# This creates a setter method `filepaths' making the filepaths available.
 downloader.download_subtitles(1)
 
-# Build the subtitles Hash. Key: title of video. Value: subtitles Array.
-downloader.build_subtitles_hash
+# This creates a setter method subtitles.
+downloader.create_subtitles(downloader.filepaths)
 
-# Build the paragraphs takes an Arg, how many paragraph keys you want created.
-# All occurrences of the key will then be found, creating the paragraph's.
-# Key: video title, Value: value array. The values are the paragraphs.
-downloader.build_paragraphs(3)
+# Subtitles is a Hash with a title and a value array of subtitles.
+downloader.create_paragraphs(downloader.subtitles)
 
 # Build the dataset information for the paragraphs.
-downloader.build_paragraph_datasets(downloader.paragraph)
+downloader.build_paragraph_datasets(downloader.paragraphs)
 
 # Paragraph_dataset is the returned setter hash from build_paragraph_datasets.
-downloader.sum_topic_values(downloader.paragraph_dataset)
+downloader.sum_topic_values(downloader.paragraph_datasets)
+
+# Pass in the Subtitle and title hash
+downloader.sum_topten_titles(downloader.subtitles)
 
 # Build the database entries. Paragraph_dataset is the returned setter hash from
 # build_paragraph_datasets.
-downloader.build_database(downloader.paragraph_dataset)
+downloader.build_database(downloader.paragraph_datasets, downloader.filepaths)
+
+# create a total of all the youtube_results adding them to the User model
+# attribute `accumulator'.
+downloader.total_users
 
 #}}}
-# {{{1 total Users
-
-# Create a hash with a defualt value of 0
-result_hash = Hash.new {|h,k| h[k] = Hash.new(0) }
-
-# iterate over each User tallying the results of all the youtube_results.
-User.all.each do |item|
-
-  # reset the accumulated_duration so it can be rebuilt dependent on any
-  # changes to its size.
-  item[:accumulated_duration] = 0
-
-  # iterate over each assosiaction record belonging to the user.
-  item.youtube_results.each do |obj|
-
-    # retrive the json hash - :meta_data and iterate over each k,v pair adding
-    # the key and counting the value to the result hash.
-    obj[:meta_data]['total'].each {|k,v| result_hash["#{item[:uploader]}"][k] += v }
-
-    # accumulate each of the durations.
-    item[:accumulated_duration] += obj[:duration]
-  end
-
-  # add the count to the video_count attribute and update the last updated
-  # accumulated_duration attribute. Lastly re add the hash to accumulator.
-  item.update(video_count: item.youtube_results.count, accumulator_last_update: Time.now, accumulator: result_hash["#{item[:uploader]}"])
-end
-# }}}

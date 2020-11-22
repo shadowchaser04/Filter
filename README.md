@@ -41,14 +41,21 @@ Paragraph is a setter method that gets created from `build paragraphs`
 Build the paragraph datasets, classifies each word based on topics and word
 classifiers.
 
-    
+
     downloader.build_paragraph_datasets(downloader.paragraph)
 
 ### Sum topics
 
-    
+
     downloader.sum_topic_values(downloader.paragraph_dataset)
 
 ### Build database
 
+
+    downloader.build_database(downloader.paragraph_dataset)
+
+### Total user
+
+
+    downloader.total_users
 
