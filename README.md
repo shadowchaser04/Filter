@@ -11,16 +11,30 @@ each youtube video it finds then downloads the subtitles and json data.
 
 ### Download the subtitles
 
-Download the subtitles takes an argument. An Integer. How many days back in your chrome history.
+Download the subtitles access's Chromes browser history. Filtering all youtube
+video urls and downloading them. It takes an argument, how many days back in
+your history do you want to retrieve.
 
 
     downloader.download_subtitles(2)
+
+#### return value: filepaths
+
+Filepaths is an `setter method Hash` consisting of a primary Key: title. And
+secondary nested keys json, and vtt. Each of which point to there absolute file
+path location.
 
 
 ### Build the subtitles
 
 
     downloader.build_subtitles_hash
+
+#### return value: subtitles
+
+Subtitles is a `setter method Hash` consisting of a primary Key: title which is
+the youtube video title and a Value: words array. Which is an array of single
+words.
 
 
 ### Build the paragraphs
@@ -31,9 +45,11 @@ All occurrences of the key will then be found, creating the paragraph's.
 
     downloader.build_paragraphs(3)
 
-### Paragraph
+### return value: paragraphs
 
-Paragraph is a setter method that gets created from `build paragraphs` 
+Paragraph is a `setter method Hash` that gets created from `build paragraphs`.
+It takes an argument, how many paragraph keys to retrieve. Each key found is
+derived from the top counted words specific to each youtube videos subtitles. 
 
 
 ### Build paragraph datasets
@@ -58,4 +74,5 @@ classifiers.
 
 
     downloader.total_users
+
 

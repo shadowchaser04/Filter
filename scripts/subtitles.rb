@@ -364,8 +364,7 @@ def create_subtitles(filepaths_hash)
 
       yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
       re = yt_user.youtube_results.find_or_create_by(title: data['title'])
-      re.update(duration: data['duration'], total:{topic[title]}, topten:{topten[title]})
-      binding.pry
+      re.update(duration: data['duration'], total:topic[title], topten:topten[title])
       re.subtitles.find_or_create_by(title:data['title'], paragraph:para)
     end
   end
@@ -380,11 +379,12 @@ def create_subtitles(filepaths_hash)
   # hash to accumulator.
 
   def total_users
+    binding.pry
     result_hash = Hash.new { |h,k| h[k] = Hash.new(0) }
     User.all.each do |item|
       item[:accumulated_duration] = 0
       item.youtube_results.each do |obj|
-        obj[:meta_data]['total'].each {|k,v| result_hash["#{item[:uploader]}"][k] += v }
+        obj[:total].each {|k,v| result_hash["#{item[:uploader]}"][k] += v }
         item[:accumulated_duration] += obj[:duration]
       end
       item.update(video_count: item.youtube_results.count, accumulator_last_update: Time.now, accumulator: result_hash["#{item[:uploader]}"])

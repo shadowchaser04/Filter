@@ -226,7 +226,8 @@ ActiveRecord::Schema.define(version: 2020_11_14_030002) do
   create_table "youtube_results", force: :cascade do |t|
     t.string "title"
     t.integer "duration"
-    t.json "meta_data"
+    t.json "total"
+    t.json "topten"
     t.integer "user_id", null: false
     t.index ["user_id"], name: "index_youtube_results_on_user_id"
   end
