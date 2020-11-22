@@ -20,7 +20,7 @@ your history do you want to retrieve.
 
 #### return value: filepaths
 
-Filepaths is an `setter method Hash` consisting of a primary Key: title and
+Filepaths is an `setter method Hash` consisting of a primary Key: `title` and
 secondary nested keys `json`, and `vtt`. Each of which point to there absolute file
 path location.
 
@@ -32,8 +32,8 @@ path location.
 
 #### return value: subtitles
 
-Subtitles is a `setter method Hash` consisting of a primary Key: title which is
-the youtube video title and a Value: words array. Which is an array of single
+Subtitles is a `setter method Hash` consisting of a primary Key: `title` which is
+the youtube video title and a Value: `words array`. Which is an array of single
 words.
 
 
