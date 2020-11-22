@@ -45,7 +45,7 @@ All occurrences of the key will then be found, creating the paragraph's.
 
     downloader.build_paragraphs(3)
 
-### return value: paragraphs
+#### return value: paragraphs
 
 Paragraph is a `setter method Hash` that gets created from `build paragraphs`.
 It takes an argument, how many paragraph keys to retrieve. Each key found is
