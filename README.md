@@ -25,7 +25,7 @@ secondary nested keys `json`, and `vtt`. Each of which point to there absolute f
 path location.
 
 
-### create the subtitles
+### Create the subtitles
 
 
     downloader.build_subtitles_hash
@@ -37,7 +37,7 @@ the youtube video title and a Value: `words array`. Which is an array of single
 words.
 
 
-### create the paragraphs
+### Create the paragraphs
 
 Build the paragraphs takes an argument, how many paragraph keys you want created.
 All occurrences of the key will then be found, creating the paragraph's.
