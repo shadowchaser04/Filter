@@ -5,15 +5,23 @@ require 'json'
 require 'logger'
 require_relative 'youtube_history'
 
-# TODO: Close chrome browser
 # TODO: Denominations of the categories turned into percentages
-# TODO: Support for safari.
-# TODO: Access history.db while browser is open.
-# TODO: Logging.
-# TODO: How to group result topics without explicit naming.
-# TODO: Add optinal words to the ten keys?
 # TODO: Documentation
+# TODO: Support for safari.
 
+# commend line args
+$user_arg = ARGV
+
+#{{{1 close chrome
+
+def kill_process(word)
+  `ps aux | grep #{word} | awk '{print $2}' | xargs kill -9`
+end
+
+# close chrome.
+kill_process("Chrome")
+
+#}}}
 # {{{1 format
 #------------------------------------------------------------------------------
 def blue(color)
@@ -143,7 +151,7 @@ class SubtitleDownloader
   # Uses youtube-dl to download subtitles and json file to.
   # ~/Downloads/Youtube/subs/
   def youtube_subtitles(address)
-      system("youtube-dl --skip-download --write-auto-sub --sub-format best --no-playlist --sub-lang en  --write-info-json \'#{address}\'")
+      system("youtube-dl --youtube-skip-dash-manifest --skip-download --write-auto-sub --sub-format best --no-playlist --sub-lang en  --write-info-json \'#{address}\'")
   end
 
   # Creates and array of absolute filepaths.
@@ -299,6 +307,7 @@ def create_subtitles(filepaths_hash)
     return words_hash
   end
 
+
   # Loop over the paragraphs_hash which is a youtube video title and hash of
   # keys with corresponding paragraphs. Loop over the hash which produces a key
   # and an array of paragraphs. Pass the paragraphs to the sentences and words
@@ -314,6 +323,8 @@ def create_subtitles(filepaths_hash)
         words = create_dataset_words(para)
         sentence.each {|k,v| words[k] = v }
         topten = remove_blacklisted_words_from(para.join.split).count_and_hash.first(10).to_h
+        full_count = remove_blacklisted_words_from(para.join.split).count_and_hash
+        $user_arg.each {|word| topten[word] = full_count[word] if full_count.has_key?(word) }
         @paragraph_datasets[title.to_sym][key.to_sym] = {paragraphs: para,topten: topten.deep_symbolize_keys,sentiment:words.deep_symbolize_keys}
       end
     end
@@ -379,7 +390,6 @@ def create_subtitles(filepaths_hash)
   # hash to accumulator.
 
   def total_users
-    binding.pry
     result_hash = Hash.new { |h,k| h[k] = Hash.new(0) }
     User.all.each do |item|
       item[:accumulated_duration] = 0
