@@ -2,18 +2,27 @@
 require File.expand_path('../../config/environment', __FILE__)
 require 'pry'
 require 'json'
-require 'logger'
 
-require_relative 'logging'
-require_relative 'y_t_history'
-require_relative 'y_t_downloader'
+#{{{1 array
+class Array
+  def count_and_hash
+    self.group_by(&:itself).transform_values(&:count).sort_by{|k, v| v}.reverse.to_h
+  end
+end
+#}}}
+#{{{1 private
+private def nested_hash
+    Hash.new {|h,k| h[k] = Hash.new }
+end
 
+private def nested_hash_default
+  Hash.new { |h,k| h[k] = Hash.new(0) }
+end
+#}}}
 # {{{1 process
 class YTProcess
 
   attr_accessor :subtitles, :paragraphs, :topic_values, :paragraph_datasets, :summed_topic_values, :summed_topten
-
-  include Logging
 
   def initialize
     @subtitles = Hash.new
@@ -23,12 +32,12 @@ class YTProcess
 
     @paragraph_datasets = nested_hash
     @added_paragraph_dataset = Hash.new {|h,k| h[k] = Hash.new {|hash,key| hash[key] = []} }
-    @logger = logger_output(STDOUT)
     @ignore_files = ["Blacklist", "User", "YoutubeResult", "Chrome", "Subtitle"]
   end
 
   # read each line of the subtitles and remove time stands and color stamps.
   def read_file(arg)
+    raise ArgumentError, "Argument must be a String" unless arg.class == String
     sanatised = []
     File.open(arg).each do |line|
       line.gsub!(/<[^>]*>/, "")
@@ -183,7 +192,6 @@ def create_subtitles(filepaths_hash)
     if hash.present?
       hash.each { |k, subs| @summed_topten[k] = remove_blacklisted_words_from(subs).count_and_hash.first(10).to_h }
     else
-      @logger.error("Error: There are #{hash.count} subtitles available in #{__method__}")
     end
   end
 
@@ -205,12 +213,11 @@ def create_subtitles(filepaths_hash)
 
       # data is the video json file for the subtitles.
       data = JSON.parse(File.read(file))
-      @logger.info("Creating: #{k} for User: #{data['uploader']}.")
 
       yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
       re = yt_user.youtube_results.find_or_create_by(title: data['title'])
       re.update(duration: data['duration'], total:topic[title], topten:topten[title])
-      re.subtitles.find_or_create_by(title:data['title'], paragraph:para)
+      re.create_subtitle(title:data['title'], paragraph:para) if re.subtitle.nil?
     end
   end
 

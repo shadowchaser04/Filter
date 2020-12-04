@@ -1,4 +1,4 @@
 class YoutubeResult < ApplicationRecord
   belongs_to :user
-  has_many :subtitles
+  has_one :subtitle
 end

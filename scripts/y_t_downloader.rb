@@ -2,24 +2,20 @@
 require File.expand_path('../../config/environment', __FILE__)
 require 'pry'
 require 'json'
-require 'logger'
-
-require_relative 'logging'
-require_relative 'y_t_history'
-require_relative 'y_t_process'
 
 # {{{1 Class: SubtitleDownloader
 
+private def nested_hash
+    Hash.new {|h,k| h[k] = Hash.new }
+end
+
 class YTDownloader
 
-  include Logging
+  attr_accessor :filepaths
 
-  attr_accessor :filepaths,
-
-  def initialize
-    @root_dir = "/Users/shadowchaser/Downloads/Youtube_Subtitles/Subs/"
+  def initialize(root_dir)
+    @root_dir = root_dir
     @filepaths = nested_hash
-    @logger = logger_output(STDOUT)
   end
 
   # Uses youtube-dl to download subtitles and json file to.
@@ -49,7 +45,6 @@ class YTDownloader
     raise ArgumentError, "Argument must be a Integer" unless int.class == Integer
     raise "There where no chrome records found to download" unless chrome_date_range(int).present?
     youtube_history = chrome_date_range(int)
-    #@logger.info("found #{youtube_history.count } youtube url(s) for days between #{int.days.ago.strftime("%A, %d %b %Y")} and #{Date.today.strftime("%A, %d %b %Y")}")
     youtube_history.each { |url| youtube_subtitles(url) }
   end
 
@@ -61,8 +56,7 @@ class YTDownloader
   # and the `type' variable to create two nested keys, the values of which are
   # the `file' block variable which is the absolute file path.
 
-  def filepaths
-    binding.pry
+  def create_filepaths
     subtitle_path = sub_dir(@root_dir)
     if subtitle_path.present?
       subtitle_path.each do |file|
@@ -76,11 +70,11 @@ class YTDownloader
       end
       @filepaths.reject! { |k,v| v.count != 2 }
       raise "no files pass validation." unless @filepaths.present?
-      filepaths = @filepaths.deep_symbolize_keys
+      # NOTE the bang may be dangerous, it may be better to to.sym type and
+      # name
+      filepaths = @filepaths.deep_symbolize_keys!
       return filepaths
     else
-      #@logger.error("#{__FILE__}:#{__LINE__}:in #{__method__}: There are #{subtitle_path.count} downloaded subtitles")
     end
   end
-
 end

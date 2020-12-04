@@ -2,15 +2,9 @@
 require File.expand_path('../../config/environment', __FILE__)
 require 'pry'
 require 'json'
-require 'logger'
-require_relative 'helper'
-require_relative 'logging'
 require_relative 'y_t_process'
 require_relative 'y_t_downloader'
 require_relative 'y_t_history'
-
-# include the youtube helper methods.
-include YTHelper
 
 # {{{1 command line args
 # commend line args
@@ -18,25 +12,40 @@ $user_arg = ARGV
 #}}}
 #{{{1 close chrome
 
+def kill_process(word)
+  `ps aux | grep #{word} | awk '{print $2}' | xargs kill -9`
+end
+
 # close chrome.
 kill_process("Chrome")
 
 #}}}
-# {{{1 logger
-include Logging
-
-# create a instance of logger for output to the sdtout
-logger = logger_output(STDOUT)
-
-# logger = STDOUT
-logger.info("Program started...")
-
-# }}}
 # {{{1 test connection
 #------------------------------------------------------------------------------
+def database_exists?
+  ActiveRecord::Base.connection
+rescue ActiveRecord::NoDatabaseError
+  false
+else
+  true
+end
+
+# NOTE: problem with any attempt to deal with this.
+# test whether then db returns true or false on the user or kicks an error.
+def has_db_been_populated
+  User.all.exists?
+end
+
+# eager load the models keep it outside the loop so its only called once.
+# For Rails5 models are now subclasses of ApplicationRecord so to get the list
+# of all models in your app you do:
+def load_models
+  Rails.application.eager_load!
+  return ApplicationRecord.descendants.collect { |type| type.name }
+end
 
 # The method Database_exists? Exits unless it is true that it exists.
-log_to_logfile.error("Program Close: Database does not exist.") unless database_exists?
+#log_to_logfile.error("Program Close: Database does not exist.") unless database_exists?
 exit unless database_exists?
 
 # Test whether the db has a User Model. If not it will exit the program.
@@ -51,11 +60,11 @@ root_dir = "/Users/shadowchaser/Downloads/Youtube_Subtitles/Subs"
 
 # Remove the directory so its empty.
 FileUtils.remove_dir(root_dir) if Dir.exist?(root_dir)
-logger.info("removed #{root_dir}") if !Dir.exist?(root_dir)
+#logger.info("removed #{root_dir}") if !Dir.exist?(root_dir)
 
 # Remake the directory so its empty.
 FileUtils.mkdir(root_dir) if !Dir.exist?(root_dir)
-logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
+#logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 
 # }}}
 #{{{1 load datasets
@@ -64,9 +73,9 @@ logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 # otherwise print the count to screen.
 
 if load_models.present?
-  logger.info("found #{load_models.count} datasets")
+  #logger.info("found #{load_models.count} datasets")
 else
-  log_to_logfile.error("#{load_models.count} datasets were found.")
+  #log_to_logfile.error("#{load_models.count} datasets were found.")
   exit
 end
 #}}}
@@ -111,7 +120,7 @@ end
 
 # Exit if there are no chrome records.
 unless Chrome.any?
-  @logger.error("DownloadSubtitlesError: Please check Chrome Model exists")
+  #@logger.error("DownloadSubtitlesError: Please check Chrome Model exists")
   exit
 end
 
@@ -125,11 +134,14 @@ home = ENV['HOME']
 downloads = File.join(home, "Downloads/Youtube_Subtitles/Subs")
 
 # Create an instance of subtitles downloader.
-downloader = YTDownloader.new
+downloader = YTDownloader.new(downloads)
 
 # Download the subtitles providing an argument how many days ago.
 # This creates a setter method `filepaths' making the filepaths available.
 downloader.download_subtitles(1)
+
+# create filepaths from the downloaded subitles.
+downloader.create_filepaths
 
 # create an instance of process.
 process = YTProcess.new
@@ -151,7 +163,7 @@ process.sum_topten_titles(process.subtitles)
 
 # Build the database entries. Paragraph_dataset is the returned setter hash from
 # build_paragraph_datasets.
-process.build_database(process.paragraph_datasets, process.filepaths)
+process.build_database(process.paragraph_datasets, downloader.filepaths)
 
 # create a total of all the youtube_results adding them to the User model
 # attribute `accumulator'.
