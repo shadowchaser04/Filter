@@ -2,26 +2,24 @@
 require File.expand_path('../../config/environment', __FILE__)
 require 'pry'
 require 'json'
+require_relative 'y_t_helper'
 
 # {{{1 Class: SubtitleDownloader
 
-private def nested_hash
-    Hash.new {|h,k| h[k] = Hash.new }
-end
-
 class YTDownloader
 
+  include YTHelper
   attr_accessor :filepaths
 
   def initialize(root_dir)
     @root_dir = root_dir
-    @filepaths = nested_hash
+    @filepaths = Hash.new {|h,k| h[k] = Hash.new }
   end
 
   # Uses youtube-dl to download subtitles and json file to.
   # ~/Downloads/Youtube/subs/
   def youtube_subtitles(address)
-      system("youtube-dl --youtube-skip-dash-manifest --skip-download --write-auto-sub --sub-format best --no-playlist --sub-lang en  --write-info-json \'#{address}\'")
+      system("youtube-dl --skip-download --write-auto-sub --sub-format best --no-playlist --sub-lang en  --write-info-json \'#{address}\'")
   end
 
   # Creates and array of absolute filepaths.
@@ -33,7 +31,12 @@ class YTDownloader
   # Pass in a date range of days to search backwards in the chrome history.
   def chrome_date_range(date_range=1)
     raise ArgumentError, "Argument must be a Integer" unless date_range.class == Integer
-    Chrome.where(:last_visit => date_range.days.ago..date_range.days.from_now).pluck(:url)
+    raise ActiveRecord::NoDatabaseError unless database_exists?
+    if load_models.include?("Chrome")
+      Chrome.where(:last_visit => date_range.days.ago..date_range.days.from_now).pluck(:url)
+    else
+      raise "The Chrome model does not exist in the database"
+    end
   end
 
   # Here we're saving the returned value of the chrome_date_range method
@@ -70,8 +73,6 @@ class YTDownloader
       end
       @filepaths.reject! { |k,v| v.count != 2 }
       raise "no files pass validation." unless @filepaths.present?
-      # NOTE the bang may be dangerous, it may be better to to.sym type and
-      # name
       filepaths = @filepaths.deep_symbolize_keys!
       return filepaths
     else

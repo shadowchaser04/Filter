@@ -5,10 +5,13 @@ require 'json'
 require_relative 'y_t_process'
 require_relative 'y_t_downloader'
 require_relative 'y_t_history'
+require_relative 'y_t_helper'
 
 # {{{1 command line args
+
 # commend line args
 $user_arg = ARGV
+
 #}}}
 #{{{1 close chrome
 
@@ -20,38 +23,6 @@ end
 kill_process("Chrome")
 
 #}}}
-# {{{1 test connection
-#------------------------------------------------------------------------------
-def database_exists?
-  ActiveRecord::Base.connection
-rescue ActiveRecord::NoDatabaseError
-  false
-else
-  true
-end
-
-# NOTE: problem with any attempt to deal with this.
-# test whether then db returns true or false on the user or kicks an error.
-def has_db_been_populated
-  User.all.exists?
-end
-
-# eager load the models keep it outside the loop so its only called once.
-# For Rails5 models are now subclasses of ApplicationRecord so to get the list
-# of all models in your app you do:
-def load_models
-  Rails.application.eager_load!
-  return ApplicationRecord.descendants.collect { |type| type.name }
-end
-
-# The method Database_exists? Exits unless it is true that it exists.
-#log_to_logfile.error("Program Close: Database does not exist.") unless database_exists?
-exit unless database_exists?
-
-# Test whether the db has a User Model. If not it will exit the program.
-has_db_been_populated
-
-# }}}
 # {{{1 remove old directories
 #------------------------------------------------------------------------------
 
@@ -66,62 +37,45 @@ FileUtils.remove_dir(root_dir) if Dir.exist?(root_dir)
 FileUtils.mkdir(root_dir) if !Dir.exist?(root_dir)
 #logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 
-# }}}
-#{{{1 load datasets
-
-# Eager loads the rails models. If datasets are not present exit and log,
-# otherwise print the count to screen.
-
-if load_models.present?
-  #logger.info("found #{load_models.count} datasets")
-else
-  #log_to_logfile.error("#{load_models.count} datasets were found.")
-  exit
-end
 #}}}
 #{{{1 chrome History
 
 # include the module youtube_history.
 include YTHistory
 
-if Chrome.present?
+# include the methods form the helper YTHelper.
+include YTHelper
 
-  # Make a connection to the chrome db
-  connect_to_chrome
+# For Rails5 models are now subclasses of ApplicationRecord. load the models
+# then use nclude to validate.
+raise "Chrome model does not exist" unless load_models.include?("Chrome")
 
-  # Create a instance of Url.
-  youtube = Url.new
+# Make a connection to the chrome db
+connect_to_chrome
 
-  # Create a hash of the youtube results from the chrome history.
-  youtube_urls_hash = youtube.youtube_urls_hash
+# Create a instance of Url.
+youtube = Url.new
 
-  # Re-establish_connection to rails db.
-  connect_to_rails
+# Create a hash of the youtube results from the chrome history.
+youtube_urls_hash = youtube.youtube_urls_hash
 
-  # Populate chrome model.
-  unless youtube_urls_hash.empty?
-    youtube_urls_hash.each do |key, value|
+# Re-establish_connection to rails db.
+connect_to_rails
 
-      # Create or find the initial object based on title and url.
-      youtube = Chrome.find_or_create_by(title: key, url: value[:url])
-      if youtube.last_visit == nil
-        youtube.update(visit_count: value[:visit_count] , last_visit: value[:last_visit])
-      # Update the Chrome ActiveRecord if the last_visit has changed.
-      elsif youtube.last_visit < value[:last_visit]
-        youtube.update(visit_count: value[:visit_count] , last_visit: value[:last_visit])
-      end
+# Populate chrome model.
+unless youtube_urls_hash.empty?
+  youtube_urls_hash.each do |key, value|
 
+    # Create or find the initial object based on title and url.
+    youtube = Chrome.find_or_create_by(title: key, url: value[:url])
+    if youtube.last_visit == nil
+      youtube.update(visit_count: value[:visit_count] , last_visit: value[:last_visit])
+    # Update the Chrome ActiveRecord if the last_visit has changed.
+    elsif youtube.last_visit < value[:last_visit]
+      youtube.update(visit_count: value[:visit_count] , last_visit: value[:last_visit])
     end
-  end
-else
-  raise "Chrome model does not exist"
-  exit
-end
 
-# Exit if there are no chrome records.
-unless Chrome.any?
-  #@logger.error("DownloadSubtitlesError: Please check Chrome Model exists")
-  exit
+  end
 end
 
 #}}}

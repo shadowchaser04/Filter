@@ -2,6 +2,7 @@
 require File.expand_path('../../config/environment', __FILE__)
 require 'pry'
 require 'json'
+require_relative 'y_t_helper'
 
 #{{{1 array
 class Array
@@ -22,6 +23,7 @@ end
 # {{{1 process
 class YTProcess
 
+  include YTHelper
   attr_accessor :subtitles, :paragraphs, :topic_values, :paragraph_datasets, :summed_topic_values, :summed_topten
 
   def initialize
@@ -102,6 +104,7 @@ def create_subtitles(filepaths_hash)
   # only sentences. Join all the paragraphs into one long string and scan the
   # string for the sentence, returning each occurrence as an array.
   # Lastly return the hash results.
+  # load_models -> YTHelper
 
   def create_dataset_sentences(paragraph)
     raise ArgumentError, "Argument must be a Array" unless paragraph.class == Array
