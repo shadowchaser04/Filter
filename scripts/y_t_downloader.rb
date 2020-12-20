@@ -19,7 +19,7 @@ class YTDownloader
   # Uses youtube-dl to download subtitles and json file to.
   # ~/Downloads/Youtube/subs/
   def youtube_subtitles(address)
-      system("youtube-dl --skip-download --write-auto-sub --sub-format best --no-playlist --sub-lang en  --write-info-json \'#{address}\'")
+      system("youtube-dl --skip-download --write-auto-sub --sub-format best --no-playlist --sub-lang en --write-info-json \'#{address}\'")
   end
 
   # Creates and array of absolute filepaths.

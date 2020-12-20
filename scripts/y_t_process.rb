@@ -214,8 +214,10 @@ def create_subtitles(filepaths_hash)
       # Key:title, NestedKey:filetype, Value: absolute path.
       file = filepaths[k][:json]
 
+      # NOTE: can downloads be catagrized by the tags? music, video essay.
       # data is the video json file for the subtitles.
       data = JSON.parse(File.read(file))
+      binding.pry
 
       yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
       re = yt_user.youtube_results.find_or_create_by(title: data['title'])

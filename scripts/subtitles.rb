@@ -7,6 +7,8 @@ require_relative 'y_t_downloader'
 require_relative 'y_t_history'
 require_relative 'y_t_helper'
 
+# TODO: add subtitles full as a model to the youtube_results.
+
 # {{{1 command line args
 
 # commend line args
