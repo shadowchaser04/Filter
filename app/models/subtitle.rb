@@ -1,3 +1,3 @@
 class Subtitle < ApplicationRecord
-  belongs_to :youtube_result
+  belongs_to :youtube_results
 end

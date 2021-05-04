@@ -46,6 +46,7 @@ class YTProcess
       line.gsub!(/(__)/, '')
       sanatised << line.gsub(/([^\w\s]|([0-9]|\:|\.))/, "").downcase
     end
+
     # remove dup lines with uniq then clean up formatting.
     aa = sanatised.uniq.join.split(" ")
     # reject any nil or empty strings
