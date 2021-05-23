@@ -4,7 +4,7 @@ require 'pry'
 require 'json'
 require 'logger'
 
-# {{{1 logger
+# logger {{{1
 #------------------------------------------------------------------------------
 # log app status's
 

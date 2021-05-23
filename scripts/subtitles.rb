@@ -6,16 +6,16 @@ require_relative 'y_t_process'
 require_relative 'y_t_downloader'
 require_relative 'y_t_history'
 require_relative 'y_t_helper'
-
 # TODO: add subtitles full as a model to the youtube_results.
 
-# {{{1 command line args
+# basic setup {{{1
+# command line args {{{2
 
 # commend line args
 $user_arg = ARGV
 
 #}}}
-#{{{1 close chrome
+# close chrome {{{2
 
 def kill_process(word)
   `ps aux | grep #{word} | awk '{print $2}' | xargs kill -9`
@@ -25,7 +25,7 @@ end
 kill_process("Chrome")
 
 #}}}
-# {{{1 remove old directories
+# remove old directories {{{2
 #------------------------------------------------------------------------------
 
 # Root directory.
@@ -40,7 +40,8 @@ FileUtils.mkdir(root_dir) if !Dir.exist?(root_dir)
 #logger.info("re-created #{root_dir}") if Dir.exist?(root_dir)
 
 #}}}
-#{{{1 chrome History
+# }}}
+# chrome History {{{1
 
 # include the module youtube_history.
 include YTHistory
@@ -81,7 +82,7 @@ unless youtube_urls_hash.empty?
 end
 
 #}}}
-# {{{1 create subtitle paragraphs
+# create subtitle paragraphs {{{1
 
 # Environment variable.
 home = ENV['HOME']
@@ -126,3 +127,5 @@ process.build_database(process.paragraph_datasets, downloader.filepaths)
 process.total_users
 
 #}}}
+
+

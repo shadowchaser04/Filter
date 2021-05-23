@@ -4,7 +4,7 @@ require 'pry'
 require 'json'
 require_relative 'y_t_helper'
 
-# {{{1 Class: SubtitleDownloader
+# Class: Subtitle Downloader {{{1
 
 class YTDownloader
 

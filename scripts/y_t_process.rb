@@ -4,14 +4,17 @@ require 'pry'
 require 'json'
 require_relative 'y_t_helper'
 
-#{{{1 array
+# array {{{1
+
 class Array
   def count_and_hash
     self.group_by(&:itself).transform_values(&:count).sort_by{|k, v| v}.reverse.to_h
   end
 end
+
 #}}}
-#{{{1 private
+# hashes {{{1
+
 private def nested_hash
     Hash.new {|h,k| h[k] = Hash.new }
 end
@@ -19,8 +22,9 @@ end
 private def nested_hash_default
   Hash.new { |h,k| h[k] = Hash.new(0) }
 end
+
 #}}}
-# {{{1 process
+# class: youutbe process {{{1
 class YTProcess
 
   include YTHelper
@@ -218,7 +222,6 @@ def create_subtitles(filepaths_hash)
       # NOTE: can downloads be catagrized by the tags? music, video essay.
       # data is the video json file for the subtitles.
       data = JSON.parse(File.read(file))
-      binding.pry
 
       yt_user = User.find_or_create_by(uploader: data['uploader'], channel_id: data['channel_id'])
       re = yt_user.youtube_results.find_or_create_by(title: data['title'])

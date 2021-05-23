@@ -6,8 +6,9 @@ require 'logger'
 require 'sqlite3'
 require 'active_record'
 
+# youtube history {{{1
 module YTHistory
-  #{{{1 methods
+  # methods {{{2
   # google chrome history
   def connect_to_chrome
     ActiveRecord::Base.establish_connection({
@@ -29,8 +30,7 @@ module YTHistory
   end
 
   #}}}
-  #{{{1 chrome
-  # declared a new model
+  # class url {{{2
   class Url < ActiveRecord::Base
 
     # create a hash named after the title of the video for all matches to the
@@ -80,3 +80,4 @@ module YTHistory
   end
 #}}}
 end
+# }}}

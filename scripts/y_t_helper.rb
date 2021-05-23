@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 require File.expand_path('../../config/environment', __FILE__)
 
+# youtube helper {{{1
 module YTHelper
 
   # eager load the models keep it outside the loop so its only called once.
@@ -21,3 +22,4 @@ module YTHelper
   end
 
 end
+# }}}
